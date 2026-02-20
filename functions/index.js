@@ -16,7 +16,8 @@ ffmpeg.setFfmpegPath(ffmpegStatic);
 
 /**
  * Firebase Storageに動画がアップロードされたら自動的に
- * H.264 / CFR(30fps) / AAC / faststart に変換する
+ * MP4コンテナに再パッケージ（映像・音声はコピー、画質劣化なし）
+ * faststartフラグを付与してストリーミング再生に最適化
  */
 exports.convertVideo = functions
   .runWith({
@@ -68,31 +69,25 @@ exports.convertVideo = functions
       console.log("ダウンロード中...");
       await bucket.file(filePath).download({ destination: tempInput });
 
-      // 2. ffmpegで変換 (H.264 / 30fps固定 / AAC / faststart)
-      console.log("変換中...");
+      // 2. ffmpegでMP4に再パッケージ（映像・音声はそのままコピー、画質劣化なし）
+      console.log("MP4再パッケージ中（画質劣化なし）...");
       await new Promise((resolve, reject) => {
         ffmpeg(tempInput)
-          .videoCodec("libx264")
           .outputOptions([
-            "-r 30",
-            "-profile:v baseline",
-            "-pix_fmt yuv420p",
+            "-c:v copy",
+            "-c:a copy",
             "-movflags +faststart",
-            "-preset fast",
-            "-crf 23",
           ])
-          .audioCodec("aac")
-          .audioBitrate("128k")
           .on("start", (cmd) => console.log("ffmpeg開始:", cmd))
           .on("progress", (p) => {
-            if (p.percent) console.log(`変換進捗: ${Math.round(p.percent)}%`);
+            if (p.percent) console.log(`進捗: ${Math.round(p.percent)}%`);
           })
           .on("end", () => {
-            console.log("変換完了");
+            console.log("再パッケージ完了");
             resolve();
           })
           .on("error", (err) => {
-            console.error("変換エラー:", err);
+            console.error("再パッケージエラー:", err);
             reject(err);
           })
           .save(tempOutput);
