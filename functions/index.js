@@ -1,15 +1,14 @@
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+const { onObjectFinalized } = require("firebase-functions/v2/storage");
+const { initializeApp } = require("firebase-admin/app");
+const { getStorage } = require("firebase-admin/storage");
+const { getFirestore } = require("firebase-admin/firestore");
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegStatic = require("ffmpeg-static");
 
-admin.initializeApp();
-
-const storage = admin.storage();
-const db = admin.firestore();
+initializeApp();
 
 // ffmpegのパスを設定
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -18,16 +17,17 @@ ffmpeg.setFfmpegPath(ffmpegStatic);
  * Firebase Storageに動画がアップロードされたら自動的に
  * H.264 / CFR(30fps) / AAC / faststart に変換する
  */
-exports.convertVideo = functions
-  .runWith({
-    timeoutSeconds: 540,  // 最大9分
-    memory: "2GB",
-  })
-  .storage.object()
-  .onFinalize(async (object) => {
-    const filePath = object.name;        // records/{childId}/xxx.mp4
-    const contentType = object.contentType;
-    const bucket = storage.bucket(object.bucket);
+exports.convertVideo = onObjectFinalized(
+  {
+    timeoutSeconds: 540,
+    memory: "2GiB",
+  },
+  async (event) => {
+    const filePath = event.data.name;
+    const contentType = event.data.contentType;
+    const bucketName = event.data.bucket;
+    const bucket = getStorage().bucket(bucketName);
+    const db = getFirestore();
 
     // 動画ファイル以外はスキップ
     if (!contentType || !contentType.startsWith("video/")) {
@@ -74,12 +74,12 @@ exports.convertVideo = functions
         ffmpeg(tempInput)
           .videoCodec("libx264")
           .outputOptions([
-            "-r 30",                      // 固定30fps
-            "-profile:v baseline",        // 広い互換性
-            "-pix_fmt yuv420p",           // 標準ピクセルフォーマット
-            "-movflags +faststart",       // Web再生最適化
-            "-preset fast",               // エンコード速度優先
-            "-crf 23",                    // 品質（18-28、低いほど高品質）
+            "-r 30",
+            "-profile:v baseline",
+            "-pix_fmt yuv420p",
+            "-movflags +faststart",
+            "-preset fast",
+            "-crf 23",
           ])
           .audioCodec("aac")
           .audioBitrate("128k")
@@ -113,13 +113,12 @@ exports.convertVideo = functions
       // 4. 変換後ファイルの公開URLを取得
       const convertedFile = bucket.file(convertedPath);
       await convertedFile.makePublic();
-      const convertedURL = `https://storage.googleapis.com/${object.bucket}/${convertedPath}`;
+      const convertedURL = `https://storage.googleapis.com/${bucketName}/${convertedPath}`;
 
       // 5. Firestoreで該当レコードを検索し、convertedURLを追加
       console.log("Firestore更新中...");
       const encodedPath = encodeURIComponent(filePath);
 
-      // childIdがあれば絞り込み検索
       let recordsSnapshot;
       if (childId) {
         recordsSnapshot = await db.collection("records")
@@ -145,7 +144,6 @@ exports.convertVideo = functions
         );
 
         if (photoIndex !== -1) {
-          // photosの該当要素にconvertedURLを追加
           const photos = [...data.photos];
           photos[photoIndex] = {
             ...photos[photoIndex],
@@ -160,7 +158,7 @@ exports.convertVideo = functions
       }
 
       if (!updated) {
-        console.log("該当するFirestoreレコードが見つかりませんでした。convertedURLの手動設定が必要です。");
+        console.log("該当するFirestoreレコードが見つかりませんでした。");
         console.log("convertedURL:", convertedURL);
       }
 
@@ -173,9 +171,9 @@ exports.convertVideo = functions
 
     } catch (error) {
       console.error("動画変換処理でエラー:", error);
-      // 一時ファイルのクリーンアップ
       try { fs.unlinkSync(tempInput); } catch (e) { /* ignore */ }
       try { fs.unlinkSync(tempOutput); } catch (e) { /* ignore */ }
       throw error;
     }
-  });
+  }
+);
