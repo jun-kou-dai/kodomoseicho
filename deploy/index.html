@@ -643,6 +643,7 @@
         // アプリケーション状態
         let currentUser = null;
         let currentChildId = null;
+        let pendingVideoTimer = null;
 
         // ========== ユーティリティ関数 ========== //
 
@@ -1198,13 +1199,98 @@
                 
                 // 月ジャンプナビを生成
                 buildMonthJumpNav(Object.keys(recordsByMonth));
-                
+
                 // ○年前の今日をロード
                 loadMemories(childId);
-                
+
+                // 変換待ち動画のチェック（既存動画の自動修復 + 定期チェック）
+                if (pendingVideoTimer) {
+                    clearInterval(pendingVideoTimer);
+                    pendingVideoTimer = null;
+                }
+                const hasPendingVideos = records.some(doc => {
+                    const d = doc.data();
+                    return d.photos && d.photos.some(p => p.type === 'video' && !p.convertedURL);
+                });
+                if (hasPendingVideos) {
+                    checkPendingVideoConversions();
+                    pendingVideoTimer = setInterval(checkPendingVideoConversions, 20000);
+                }
+
             } catch (error) {
                 console.error('Load timeline error:', error);
                 timelineEl.innerHTML = `<p style="color: #F44336; text-align: center;">エラー: ${error.message}</p>`;
+            }
+        }
+
+        /**
+         * 動画変換済みURLの自動検出・修復
+         * Cloud Functionが変換したファイルをStorageから探し、Firestoreに反映する
+         */
+        async function checkPendingVideoConversions() {
+            if (!currentChildId) return;
+
+            try {
+                const snapshot = await db.collection('records')
+                    .where('childId', '==', currentChildId)
+                    .orderBy('recordDate', 'desc')
+                    .limit(50)
+                    .get();
+
+                const pendingItems = [];
+
+                for (const doc of snapshot.docs) {
+                    const data = doc.data();
+                    if (data.isDeleted || !data.photos || !Array.isArray(data.photos)) continue;
+
+                    for (let i = 0; i < data.photos.length; i++) {
+                        const photo = data.photos[i];
+                        if (photo.type === 'video' && !photo.convertedURL) {
+                            pendingItems.push({ doc, photoIndex: i, photo });
+                        }
+                    }
+                }
+
+                if (pendingItems.length === 0) {
+                    if (pendingVideoTimer) {
+                        clearInterval(pendingVideoTimer);
+                        pendingVideoTimer = null;
+                    }
+                    return;
+                }
+
+                let anyUpdated = false;
+
+                for (const { doc, photoIndex, photo } of pendingItems) {
+                    try {
+                        const match = photo.photoURL.match(/\/o\/([^?]+)/);
+                        if (!match) continue;
+
+                        const storagePath = decodeURIComponent(match[1]);
+                        const lastDot = storagePath.lastIndexOf('.');
+                        const basePath = lastDot !== -1 ? storagePath.substring(0, lastDot) : storagePath;
+                        const convertedStoragePath = basePath + '_web.mp4';
+
+                        const convertedRef = storage.ref(convertedStoragePath);
+                        const convertedURL = await convertedRef.getDownloadURL();
+
+                        const data = doc.data();
+                        const photos = [...data.photos];
+                        photos[photoIndex] = { ...photos[photoIndex], convertedURL };
+                        await doc.ref.update({ photos });
+
+                        console.log('変換済み動画URLを修復:', doc.id);
+                        anyUpdated = true;
+                    } catch (e) {
+                        // ファイル未存在 = まだ変換中
+                    }
+                }
+
+                if (anyUpdated) {
+                    loadTimeline(currentChildId);
+                }
+            } catch (error) {
+                console.error('変換チェックエラー:', error);
             }
         }
 
