@@ -643,7 +643,7 @@
         // アプリケーション状態
         let currentUser = null;
         let currentChildId = null;
-        let pendingVideoTimer = null;
+        let pendingVideoTimer = null; // 未使用（変換不要）
 
         // ========== ユーティリティ関数 ========== //
 
@@ -1203,18 +1203,10 @@
                 // ○年前の今日をロード
                 loadMemories(childId);
 
-                // 変換待ち動画のチェック（既存動画の自動修復 + 定期チェック）
+                // 変換チェック不要（元動画をそのまま再生するため）
                 if (pendingVideoTimer) {
                     clearInterval(pendingVideoTimer);
                     pendingVideoTimer = null;
-                }
-                const hasPendingVideos = records.some(doc => {
-                    const d = doc.data();
-                    return d.photos && d.photos.some(p => p.type === 'video' && !p.convertedURL);
-                });
-                if (hasPendingVideos) {
-                    checkPendingVideoConversions();
-                    pendingVideoTimer = setInterval(checkPendingVideoConversions, 20000);
                 }
 
             } catch (error) {
@@ -1628,13 +1620,10 @@
                 const firstPhoto = record.photos[0];
                 const isFirstVideo = firstPhoto.type === 'video';
                 const heroSrc = isFirstVideo ? (firstPhoto.thumbnailURL || firstPhoto.photoURL) : firstPhoto.photoURL;
-                const isProcessing = isFirstVideo && !firstPhoto.convertedURL;
-
                 article.innerHTML = `
                     <div class="record-photo-hero">
                         <img src="${heroSrc}" alt="" loading="lazy">
                         ${isFirstVideo ? `<div class="video-badge"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>` : ''}
-                        ${isProcessing ? `<div class="video-processing-badge"><span class="processing-dot"></span>変換中</div>` : ''}
                         ${record.photos.length > 1 ? `<span class="photo-count">📷 ${record.photos.length}枚</span>` : ''}
                         <div class="record-photo-overlay">
                             <p class="record-comment-overlay">${escapeHtml(record.comment)}</p>
@@ -2288,8 +2277,8 @@
                         if (photo.type === 'video') {
                             // 動画: <video>タグを使用
                             const video = document.createElement('video');
-                            // convertedURLがあれば変換済み動画を使用（音ズレ防止）
-                            video.src = photo.convertedURL || photo.photoURL;
+                            // 元動画をそのまま再生（画質劣化なし）
+                            video.src = photo.photoURL;
                             video.controls = true;
                             video.playsInline = true;
                             video.preload = 'auto';
