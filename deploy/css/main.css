@@ -86,3 +86,121 @@
     color: var(--text-white);
     border-color: var(--accent-blue);
 }
+
+/* ========== 動画関連 ========== */
+
+/* 詳細モーダル内の動画プレーヤー */
+#photoGallery video {
+    display: none;
+    width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+    background: #000;
+    border-radius: var(--radius-md);
+    position: relative;
+    opacity: 1;
+    transition: none;
+}
+
+#photoGallery video.active {
+    display: block;
+    position: relative;
+    opacity: 1;
+}
+
+/* タイムラインカードの動画バッジ */
+.video-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 48px;
+    height: 48px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.video-badge svg {
+    width: 22px;
+    height: 22px;
+    fill: white;
+    margin-left: 3px;
+}
+
+/* アルバムグリッドの動画アイコン */
+.album-video-icon {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+    z-index: 2;
+}
+
+.album-video-icon svg {
+    width: 12px;
+    height: 12px;
+    fill: white;
+    margin-left: 1px;
+}
+
+/* 動画変換中のインジケーター */
+.video-processing-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: rgba(255, 152, 0, 0.9);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 2;
+}
+
+.video-processing-badge .processing-dot {
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 50%;
+    animation: processingPulse 1s ease-in-out infinite;
+}
+
+@keyframes processingPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+/* 動画アップロード時のプログレスバー */
+.upload-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--border-light);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    overflow: hidden;
+}
+
+.upload-progress-bar {
+    height: 100%;
+    background: var(--accent-blue);
+    transition: width 0.3s ease;
+    width: 0%;
+}

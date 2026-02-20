@@ -215,32 +215,32 @@
             <!-- 写真選択 -->
             <div class="photo-selector" id="photoSelector">
                 <div class="photo-box primary">
-                    <input type="file" id="photo1" accept="image/*">
+                    <input type="file" id="photo1" accept="image/*,video/mp4,video/quicktime,video/webm">
                     <label for="photo1">
                         <span class="icon">📷</span>
-                        <span class="text">写真を追加</span>
+                        <span class="text">写真・動画</span>
                     </label>
                 </div>
                 <div class="photo-box">
-                    <input type="file" id="photo2" accept="image/*" disabled>
+                    <input type="file" id="photo2" accept="image/*,video/mp4,video/quicktime,video/webm" disabled>
                     <label for="photo2">
                         <span class="icon">+</span>
                     </label>
                 </div>
                 <div class="photo-box">
-                    <input type="file" id="photo3" accept="image/*" disabled>
+                    <input type="file" id="photo3" accept="image/*,video/mp4,video/quicktime,video/webm" disabled>
                     <label for="photo3">
                         <span class="icon">+</span>
                     </label>
                 </div>
                 <div class="photo-box">
-                    <input type="file" id="photo4" accept="image/*" disabled>
+                    <input type="file" id="photo4" accept="image/*,video/mp4,video/quicktime,video/webm" disabled>
                     <label for="photo4">
                         <span class="icon">+</span>
                     </label>
                 </div>
                 <div class="photo-box">
-                    <input type="file" id="photo5" accept="image/*" disabled>
+                    <input type="file" id="photo5" accept="image/*,video/mp4,video/quicktime,video/webm" disabled>
                     <label for="photo5">
                         <span class="icon">+</span>
                     </label>
@@ -727,6 +727,77 @@
                 };
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
+            });
+        }
+
+        // ========== 動画ヘルパー関数 ========== //
+
+        /**
+         * ファイルが動画かどうかを判定
+         */
+        function isVideoFile(file) {
+            const videoTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v'];
+            return videoTypes.includes(file.type) || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+        }
+
+        /**
+         * 動画のサムネイルを生成（0.5秒目のフレーム）
+         */
+        function generateVideoThumbnail(file) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.muted = true;
+                video.playsInline = true;
+
+                const url = URL.createObjectURL(file);
+                video.src = url;
+
+                video.onloadeddata = () => {
+                    video.currentTime = Math.min(0.5, video.duration / 2);
+                };
+
+                video.onseeked = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.min(video.videoWidth, 640);
+                        canvas.height = Math.round(canvas.width * (video.videoHeight / video.videoWidth));
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        canvas.toBlob((blob) => {
+                            URL.revokeObjectURL(url);
+                            resolve(blob);
+                        }, 'image/jpeg', 0.8);
+                    } catch (err) {
+                        URL.revokeObjectURL(url);
+                        reject(err);
+                    }
+                };
+
+                video.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('動画の読み込みに失敗しました'));
+                };
+            });
+        }
+
+        /**
+         * 動画の長さを取得（秒）
+         */
+        function getVideoDuration(file) {
+            return new Promise((resolve) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                const url = URL.createObjectURL(file);
+                video.src = url;
+                video.onloadedmetadata = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(video.duration);
+                };
+                video.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(0);
+                };
             });
         }
 
@@ -1290,8 +1361,9 @@
                         card.innerHTML = `
                             <div class="memory-card-badge">${yearsAgo}年前の今日</div>
                             ${hasPhoto ? `
-                                <div class="memory-card-photo">
-                                    <img src="${record.photos[0].photoURL}" alt="" loading="lazy">
+                                <div class="memory-card-photo" style="position:relative;">
+                                    <img src="${record.photos[0].type === 'video' ? (record.photos[0].thumbnailURL || record.photos[0].photoURL) : record.photos[0].photoURL}" alt="" loading="lazy">
+                                    ${record.photos[0].type === 'video' ? `<div class="album-video-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="white"/></svg></div>` : ''}
                                 </div>
                             ` : `
                                 <div class="memory-card-nophoto">
@@ -1393,8 +1465,10 @@
                     record.photos.forEach((photo, idx) => {
                         const item = document.createElement('div');
                         item.className = 'album-grid-item';
+                        const albumSrc = photo.type === 'video' ? (photo.thumbnailURL || photo.photoURL) : photo.photoURL;
                         item.innerHTML = `
-                            <img src="${photo.photoURL}" alt="" loading="lazy">
+                            <img src="${albumSrc}" alt="" loading="lazy">
+                            ${photo.type === 'video' ? `<div class="album-video-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="white"/></svg></div>` : ''}
                             <span class="album-grid-date">${dayStr}</span>
                         `;
                         item.addEventListener('click', () => showRecordDetail(record.id));
@@ -1465,9 +1539,16 @@
 
             if (hasPhotos) {
                 article.className = 'record-card record-card--photo';
+                const firstPhoto = record.photos[0];
+                const isFirstVideo = firstPhoto.type === 'video';
+                const heroSrc = isFirstVideo ? (firstPhoto.thumbnailURL || firstPhoto.photoURL) : firstPhoto.photoURL;
+                const isProcessing = isFirstVideo && !firstPhoto.convertedURL;
+
                 article.innerHTML = `
                     <div class="record-photo-hero">
-                        <img src="${record.photos[0].photoURL}" alt="" loading="lazy">
+                        <img src="${heroSrc}" alt="" loading="lazy">
+                        ${isFirstVideo ? `<div class="video-badge"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>` : ''}
+                        ${isProcessing ? `<div class="video-processing-badge"><span class="processing-dot"></span>変換中</div>` : ''}
                         ${record.photos.length > 1 ? `<span class="photo-count">📷 ${record.photos.length}枚</span>` : ''}
                         <div class="record-photo-overlay">
                             <p class="record-comment-overlay">${escapeHtml(record.comment)}</p>
@@ -1831,7 +1912,7 @@
                     });
                 });
 
-                // 写真選択
+                // 写真・動画選択
                 for (let i = 1; i <= 5; i++) {
                     const input = document.getElementById(`photo${i}`);
 
@@ -1839,18 +1920,27 @@
                         const file = e.target.files[0];
                         if (!file) return;
 
-                        // バリデーション
-                        if (file.size > 5 * 1024 * 1024) {
-                            showToast('ファイルサイズは5MB以下にしてください', 'error');
-                            input.value = '';
-                            return;
-                        }
+                        const isVideo = isVideoFile(file);
 
-                        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-                        if (!allowedTypes.includes(file.type)) {
-                            showToast('JPEG、PNG、WebP形式の画像のみアップロード可能です', 'error');
-                            input.value = '';
-                            return;
+                        // バリデーション
+                        if (isVideo) {
+                            if (file.size > 100 * 1024 * 1024) {
+                                showToast('動画は100MB以下にしてください', 'error');
+                                input.value = '';
+                                return;
+                            }
+                        } else {
+                            if (file.size > 5 * 1024 * 1024) {
+                                showToast('画像は5MB以下にしてください', 'error');
+                                input.value = '';
+                                return;
+                            }
+                            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                            if (!allowedTypes.includes(file.type)) {
+                                showToast('JPEG、PNG、WebP形式の画像、またはMP4、MOV、WebM形式の動画をアップロードできます', 'error');
+                                input.value = '';
+                                return;
+                            }
                         }
 
                         // プレビュー表示
@@ -1861,8 +1951,50 @@
                         const existingPreview = box.querySelector('img.preview');
                         if (existingPreview) existingPreview.remove();
 
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
+                        if (isVideo) {
+                            // 動画のサムネイルプレビュー
+                            try {
+                                const thumbBlob = await generateVideoThumbnail(file);
+                                const thumbUrl = URL.createObjectURL(thumbBlob);
+                                const img = document.createElement('img');
+                                img.className = 'preview';
+                                img.src = thumbUrl;
+                                box.insertBefore(img, label);
+
+                                // 動画マーク
+                                let videoBadge = box.querySelector('.video-preview-badge');
+                                if (!videoBadge) {
+                                    videoBadge = document.createElement('div');
+                                    videoBadge.className = 'video-preview-badge';
+                                    videoBadge.style.cssText = 'position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:1px 5px;border-radius:4px;z-index:5;';
+                                    videoBadge.textContent = '▶ 動画';
+                                    box.appendChild(videoBadge);
+                                }
+
+                                // 削除ボタン
+                                if (!box.querySelector('.remove-btn')) {
+                                    const removeBtn = document.createElement('button');
+                                    removeBtn.className = 'remove-btn';
+                                    removeBtn.textContent = '×';
+                                    removeBtn.onclick = (ev) => {
+                                        ev.preventDefault();
+                                        img.remove();
+                                        removeBtn.remove();
+                                        if (videoBadge) videoBadge.remove();
+                                        input.value = '';
+                                        selectedPhotos = selectedPhotos.filter((_, idx) => idx !== i - 1);
+                                        if (i < 5) document.getElementById(`photo${i + 1}`).disabled = true;
+                                        updateSubmitButton();
+                                    };
+                                    box.appendChild(removeBtn);
+                                }
+                            } catch (err) {
+                                console.error('サムネイル生成エラー:', err);
+                                showToast('動画のプレビュー生成に失敗しました', 'error');
+                            }
+                        } else {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
                             const img = document.createElement('img');
                             img.className = 'preview';
                             img.src = e.target.result;
@@ -1891,6 +2023,7 @@
                             }
                         };
                         reader.readAsDataURL(file);
+                        } // end else (image)
 
                         selectedPhotos[i - 1] = file;
 
@@ -1918,26 +2051,67 @@
                         const height = document.getElementById('recordHeight').value;
                         const weight = document.getElementById('recordWeight').value;
 
-                        // 写真をアップロード
+                        // 写真・動画をアップロード
                         const photoUploadPromises = selectedPhotos.filter(p => p).map(async (file, index) => {
-                            // リサイズ
-                            const resizedBlob = await resizeImage(file, 1200, 1200, 0.85);
-
-                            // アップロード
+                            const isVideo = isVideoFile(file);
                             const timestamp = Date.now();
                             const randomStr = Math.random().toString(36).substring(7);
                             const ext = file.name.split('.').pop();
                             const fileName = `${timestamp}_${randomStr}.${ext}`;
 
-                            const storageRef = storage.ref(`records/${currentChildId}/${fileName}`);
-                            await storageRef.put(resizedBlob);
-                            const downloadURL = await storageRef.getDownloadURL();
+                            if (isVideo) {
+                                // 動画: そのままアップロード（Cloud Functionsで変換）
+                                const storageRef = storage.ref(`records/${currentChildId}/${fileName}`);
+                                const uploadTask = storageRef.put(file);
 
-                            return {
-                                photoURL: downloadURL,
-                                displayOrder: index,
-                                uploadedAt: new Date().toISOString()
-                            };
+                                // プログレス表示
+                                await new Promise((resolve, reject) => {
+                                    uploadTask.on('state_changed',
+                                        (snapshot) => {
+                                            const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                                            const submitBtn = document.getElementById('submitRecord');
+                                            submitBtn.textContent = `アップロード中... ${progress}%`;
+                                        },
+                                        reject,
+                                        resolve
+                                    );
+                                });
+
+                                const downloadURL = await storageRef.getDownloadURL();
+
+                                // サムネイルを生成・アップロード
+                                let thumbnailURL = '';
+                                try {
+                                    const thumbBlob = await generateVideoThumbnail(file);
+                                    const thumbFileName = `${timestamp}_${randomStr}_thumb.jpg`;
+                                    const thumbRef = storage.ref(`records/${currentChildId}/${thumbFileName}`);
+                                    await thumbRef.put(thumbBlob);
+                                    thumbnailURL = await thumbRef.getDownloadURL();
+                                } catch (err) {
+                                    console.error('サムネイルアップロードエラー:', err);
+                                }
+
+                                return {
+                                    photoURL: downloadURL,
+                                    thumbnailURL: thumbnailURL,
+                                    type: 'video',
+                                    displayOrder: index,
+                                    uploadedAt: new Date().toISOString()
+                                };
+                            } else {
+                                // 画像: リサイズしてアップロード
+                                const resizedBlob = await resizeImage(file, 1200, 1200, 0.85);
+                                const storageRef = storage.ref(`records/${currentChildId}/${fileName}`);
+                                await storageRef.put(resizedBlob);
+                                const downloadURL = await storageRef.getDownloadURL();
+
+                                return {
+                                    photoURL: downloadURL,
+                                    type: 'image',
+                                    displayOrder: index,
+                                    uploadedAt: new Date().toISOString()
+                                };
+                            }
                         });
 
                         const photos = await Promise.all(photoUploadPromises);
@@ -2025,10 +2199,24 @@
 
                 if (currentRecordData.photos && currentRecordData.photos.length > 0) {
                     currentRecordData.photos.forEach((photo, index) => {
-                        const img = document.createElement('img');
-                        img.src = photo.photoURL;
-                        img.className = index === 0 ? 'active' : '';
-                        gallery.appendChild(img);
+                        if (photo.type === 'video') {
+                            // 動画: <video>タグを使用
+                            const video = document.createElement('video');
+                            // convertedURLがあれば変換済み動画を使用（音ズレ防止）
+                            video.src = photo.convertedURL || photo.photoURL;
+                            video.controls = true;
+                            video.playsInline = true;
+                            video.preload = 'auto';
+                            video.poster = photo.thumbnailURL || '';
+                            video.className = index === 0 ? 'active' : '';
+                            gallery.appendChild(video);
+                        } else {
+                            // 画像: <img>タグを使用
+                            const img = document.createElement('img');
+                            img.src = photo.photoURL;
+                            img.className = index === 0 ? 'active' : '';
+                            gallery.appendChild(img);
+                        }
 
                         // ドット
                         if (currentRecordData.photos.length > 1) {
@@ -2183,10 +2371,16 @@
 
             currentPhotoIndex = index;
 
-            // 写真の表示切り替え
-            const images = document.querySelectorAll('#photoGallery img');
-            images.forEach((img, i) => {
-                img.classList.toggle('active', i === index);
+            // 写真・動画の表示切り替え
+            const items = document.querySelectorAll('#photoGallery img, #photoGallery video');
+            items.forEach((el, i) => {
+                el.classList.toggle('active', i === index);
+                // 動画の場合、非表示時は一時停止
+                if (el.tagName === 'VIDEO') {
+                    if (i !== index) {
+                        el.pause();
+                    }
+                }
             });
 
             // ドットの表示切り替え
@@ -2198,6 +2392,11 @@
 
         // 詳細モーダルを閉じる
         function closeDetailModal() {
+            // 動画を停止
+            document.querySelectorAll('#photoGallery video').forEach(v => {
+                v.pause();
+                v.currentTime = 0;
+            });
             const modal = document.getElementById('detailModal');
             const overlay = document.getElementById('detailModalOverlay');
             modal.classList.remove('show');
@@ -2242,10 +2441,20 @@
             recordData.photos.forEach((photo, index) => {
                 const box = document.createElement('div');
                 box.className = index === 0 ? 'photo-box primary' : 'photo-box';
+                box.style.position = 'relative';
 
                 const img = document.createElement('img');
                 img.className = 'preview';
-                img.src = photo.photoURL;
+                // 動画の場合はサムネイルを表示
+                img.src = photo.type === 'video' ? (photo.thumbnailURL || photo.photoURL) : photo.photoURL;
+
+                // 動画マーク
+                if (photo.type === 'video') {
+                    const badge = document.createElement('div');
+                    badge.style.cssText = 'position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:1px 5px;border-radius:4px;z-index:5;';
+                    badge.textContent = '▶ 動画';
+                    box.appendChild(badge);
+                }
 
                 const removeBtn = document.createElement('button');
                 removeBtn.className = 'remove-btn';
