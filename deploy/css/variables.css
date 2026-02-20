@@ -1,0 +1,81 @@
+/* デザイントークン - Memories App */
+
+:root {
+    /* ========== カラー ========== */
+    /* プライマリ（ピンク系） */
+    --primary-pink: #FF6B9D;
+    --primary-pink-dark: #E91E63;
+    --primary-pink-light: rgba(255, 107, 157, 0.15);
+
+    /* アクセント（ブルー系） */
+    --accent-blue: #42A5F5;
+    --accent-blue-dark: #1E88E5;
+    --accent-blue-light: rgba(66, 165, 245, 0.15);
+
+    /* テキスト */
+    --text-primary: #1A1A1A;
+    --text-secondary: #757575;
+    --text-disabled: #BDBDBD;
+    --text-white: #FFFFFF;
+
+    /* 背景 */
+    --bg-primary: #F5F5F5;
+    --bg-secondary: #FFFFFF;
+    --bg-card: #FFFFFF;
+
+    /* ボーダー */
+    --border-light: #F0F0F0;
+    --border-medium: #E0E0E0;
+
+    /* カテゴリカラー */
+    --category-daily: #9E9E9E;
+    --category-meal: #FF9800;
+    --category-play: #E91E63;
+    --category-outing: #2196F3;
+    --category-growth: #4CAF50;
+
+    /* ========== タイポグラフィ ========== */
+    --font-size-xs: 12px;
+    --font-size-sm: 14px;
+    --font-size-md: 16px;
+    --font-size-lg: 18px;
+    --font-size-xl: 24px;
+
+    --font-weight-medium: 500;
+    --font-weight-bold: 700;
+
+    /* ========== スペーシング ========== */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+
+    /* ========== ボーダー半径 ========== */
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+
+    /* ========== シャドウ ========== */
+    --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+    /* ========== トランジション ========== */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+
+    /* ========== レイアウト ========== */
+    --button-height: 48px;
+    --touch-min: 44px;
+
+    /* ========== Z-index ========== */
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-modal-overlay: 400;
+    --z-modal: 500;
+    --z-toast: 600;
+}

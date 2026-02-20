@@ -1,0 +1,88 @@
+/* メインレイアウト - Memories App */
+
+/* ========== アプリコンテナ ========== */
+.app-container {
+    max-width: 600px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--bg-secondary);
+    position: relative;
+}
+
+/* ========== スクリーン ========== */
+.screen {
+    min-height: 100vh;
+}
+
+/* ========== タイムライン ========== */
+.timeline {
+    /* タイムライン表示エリア */
+}
+
+/* ========== カテゴリボタン ========== */
+.category-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.category-btn {
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    border: 1.5px solid var(--border-medium);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.category-btn:hover {
+    border-color: var(--border-medium);
+    background: var(--bg-primary);
+}
+
+.category-btn.active {
+    color: var(--text-white);
+    border-color: transparent;
+}
+
+.category-btn.daily.active {
+    background: #9E9E9E;
+}
+
+.category-btn.meal.active {
+    background: #FF9800;
+}
+
+.category-btn.play.active {
+    background: #E91E63;
+}
+
+.category-btn.outing.active {
+    background: #2196F3;
+}
+
+.category-btn.growth.active {
+    background: #4CAF50;
+}
+
+/* ========== 性別ボタン ========== */
+.gender-btn {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    border: 1.5px solid var(--border-medium);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.gender-btn.active {
+    background: var(--accent-blue);
+    color: var(--text-white);
+    border-color: var(--accent-blue);
+}
