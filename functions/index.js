@@ -16,8 +16,7 @@ ffmpeg.setFfmpegPath(ffmpegStatic);
 
 /**
  * Firebase Storageに動画がアップロードされたら自動的に
- * MP4コンテナに再パッケージ（映像・音声はコピー、画質劣化なし）
- * faststartフラグを付与してストリーミング再生に最適化
+ * VFR→CFR変換（音ズレ解消）+ 高画質再エンコード + ストリーミング最適化
  */
 exports.convertVideo = functions
   .runWith({
@@ -69,25 +68,31 @@ exports.convertVideo = functions
       console.log("ダウンロード中...");
       await bucket.file(filePath).download({ destination: tempInput });
 
-      // 2. ffmpegでMP4に再パッケージ（映像・音声はそのままコピー、画質劣化なし）
-      console.log("MP4再パッケージ中（画質劣化なし）...");
+      // 2. ffmpegでVFR→CFR変換 + 高画質再エンコード（音ズレ解消）
+      console.log("VFR→CFR変換中（高画質再エンコード）...");
       await new Promise((resolve, reject) => {
         ffmpeg(tempInput)
+          .videoCodec("libx264")
           .outputOptions([
-            "-c:v copy",
-            "-c:a copy",
-            "-movflags +faststart",
+            "-crf 18",              // ほぼ視覚的にロスレス
+            "-preset medium",       // 品質とエンコード速度のバランス
+            "-r 30",                // CFR 30fps（VFR→CFR変換で音ズレ解消）
+            "-profile:v high",      // high profile（高画質）
+            "-pix_fmt yuv420p",     // ブラウザ互換性
+            "-movflags +faststart", // ストリーミング最適化
           ])
+          .audioCodec("aac")
+          .audioBitrate("192k")
           .on("start", (cmd) => console.log("ffmpeg開始:", cmd))
           .on("progress", (p) => {
             if (p.percent) console.log(`進捗: ${Math.round(p.percent)}%`);
           })
           .on("end", () => {
-            console.log("再パッケージ完了");
+            console.log("VFR→CFR変換完了");
             resolve();
           })
           .on("error", (err) => {
-            console.error("再パッケージエラー:", err);
+            console.error("変換エラー:", err);
             reject(err);
           })
           .save(tempOutput);

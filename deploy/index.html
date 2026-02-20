@@ -643,7 +643,7 @@
         // アプリケーション状態
         let currentUser = null;
         let currentChildId = null;
-        let pendingVideoTimer = null; // 未使用（変換不要）
+        let pendingVideoTimer = null;
 
         // ========== ユーティリティ関数 ========== //
 
@@ -1203,11 +1203,10 @@
                 // ○年前の今日をロード
                 loadMemories(childId);
 
-                // 変換チェック不要（元動画をそのまま再生するため）
-                if (pendingVideoTimer) {
-                    clearInterval(pendingVideoTimer);
-                    pendingVideoTimer = null;
-                }
+                // 変換中の動画がないかチェック（定期ポーリング）
+                checkPendingVideoConversions();
+                if (pendingVideoTimer) clearInterval(pendingVideoTimer);
+                pendingVideoTimer = setInterval(checkPendingVideoConversions, 15000);
 
             } catch (error) {
                 console.error('Load timeline error:', error);
@@ -1619,11 +1618,13 @@
                 article.className = 'record-card record-card--photo';
                 const firstPhoto = record.photos[0];
                 const isFirstVideo = firstPhoto.type === 'video';
+                const isConverting = isFirstVideo && !firstPhoto.convertedURL;
                 const heroSrc = isFirstVideo ? (firstPhoto.thumbnailURL || firstPhoto.photoURL) : firstPhoto.photoURL;
                 article.innerHTML = `
                     <div class="record-photo-hero">
                         <img src="${heroSrc}" alt="" loading="lazy">
                         ${isFirstVideo ? `<div class="video-badge"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>` : ''}
+                        ${isConverting ? `<span class="converting-badge">変換中...</span>` : ''}
                         ${record.photos.length > 1 ? `<span class="photo-count">📷 ${record.photos.length}枚</span>` : ''}
                         <div class="record-photo-overlay">
                             <p class="record-comment-overlay">${escapeHtml(record.comment)}</p>
@@ -2277,14 +2278,21 @@
                         if (photo.type === 'video') {
                             // 動画: <video>タグを使用
                             const video = document.createElement('video');
-                            // 元動画をそのまま再生（画質劣化なし）
-                            video.src = photo.photoURL;
+                            // 変換済み動画があればそちらを再生（VFR→CFR変換で音ズレ解消）
+                            video.src = photo.convertedURL || photo.photoURL;
                             video.controls = true;
                             video.playsInline = true;
                             video.preload = 'auto';
                             video.poster = photo.thumbnailURL || '';
                             video.className = index === 0 ? 'active' : '';
                             gallery.appendChild(video);
+                            // 変換中メッセージ
+                            if (!photo.convertedURL) {
+                                const notice = document.createElement('div');
+                                notice.className = 'converting-notice';
+                                notice.textContent = '動画を最適化中です。しばらくお待ちください...';
+                                gallery.appendChild(notice);
+                            }
                         } else {
                             // 画像: <img>タグを使用
                             const img = document.createElement('img');

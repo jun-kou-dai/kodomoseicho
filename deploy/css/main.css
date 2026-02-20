@@ -133,6 +133,29 @@
     margin-left: 3px;
 }
 
+/* 動画変換中バッジ（タイムラインカード上） */
+.converting-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255, 152, 0, 0.9);
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* 動画変換中メッセージ（詳細ビュー） */
+.converting-notice {
+    text-align: center;
+    color: #FF9800;
+    font-size: 13px;
+    padding: 8px 0 4px;
+}
+
 /* アルバムグリッドの動画アイコン */
 .album-video-icon {
     position: absolute;
