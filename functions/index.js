@@ -119,17 +119,16 @@ exports.convertVideo = functions
       console.log("Firestore更新中...");
       const encodedPath = encodeURIComponent(filePath);
 
+      // インデックス不要なクエリ（childIdのみで絞り込み）
       let recordsSnapshot;
       if (childId) {
         recordsSnapshot = await db.collection("records")
           .where("childId", "==", childId)
-          .orderBy("createdAt", "desc")
-          .limit(50)
+          .limit(100)
           .get();
       } else {
         recordsSnapshot = await db.collection("records")
-          .orderBy("createdAt", "desc")
-          .limit(100)
+          .limit(200)
           .get();
       }
 
