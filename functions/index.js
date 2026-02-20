@@ -1,14 +1,15 @@
-const { onObjectFinalized } = require("firebase-functions/v2/storage");
-const { initializeApp } = require("firebase-admin/app");
-const { getStorage } = require("firebase-admin/storage");
-const { getFirestore } = require("firebase-admin/firestore");
+const functions = require("firebase-functions/v1");
+const admin = require("firebase-admin");
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegStatic = require("ffmpeg-static");
 
-initializeApp();
+admin.initializeApp();
+
+const storage = admin.storage();
+const db = admin.firestore();
 
 // ffmpegのパスを設定
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -17,17 +18,16 @@ ffmpeg.setFfmpegPath(ffmpegStatic);
  * Firebase Storageに動画がアップロードされたら自動的に
  * H.264 / CFR(30fps) / AAC / faststart に変換する
  */
-exports.convertVideo = onObjectFinalized(
-  {
+exports.convertVideo = functions
+  .runWith({
     timeoutSeconds: 540,
-    memory: "2GiB",
-  },
-  async (event) => {
-    const filePath = event.data.name;
-    const contentType = event.data.contentType;
-    const bucketName = event.data.bucket;
-    const bucket = getStorage().bucket(bucketName);
-    const db = getFirestore();
+    memory: "2GB",
+  })
+  .storage.object()
+  .onFinalize(async (object) => {
+    const filePath = object.name;
+    const contentType = object.contentType;
+    const bucket = storage.bucket(object.bucket);
 
     // 動画ファイル以外はスキップ
     if (!contentType || !contentType.startsWith("video/")) {
@@ -113,7 +113,7 @@ exports.convertVideo = onObjectFinalized(
       // 4. 変換後ファイルの公開URLを取得
       const convertedFile = bucket.file(convertedPath);
       await convertedFile.makePublic();
-      const convertedURL = `https://storage.googleapis.com/${bucketName}/${convertedPath}`;
+      const convertedURL = `https://storage.googleapis.com/${object.bucket}/${convertedPath}`;
 
       // 5. Firestoreで該当レコードを検索し、convertedURLを追加
       console.log("Firestore更新中...");
@@ -175,5 +175,4 @@ exports.convertVideo = onObjectFinalized(
       try { fs.unlinkSync(tempOutput); } catch (e) { /* ignore */ }
       throw error;
     }
-  }
-);
+  });
