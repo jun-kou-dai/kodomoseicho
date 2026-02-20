@@ -1,0 +1,3329 @@
+<!DOCTYPE html>
+<!-- Updated: 2026-02-01 -->
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📸 Memories - 子供の成長記録</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Firebase SDK v10.7.1 -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/main.css">
+</head>
+
+<body>
+    <!-- ログイン画面 (SC01) -->
+    <div id="loginScreen" class="screen login-screen">
+        <div class="login-container">
+            <h1 class="logo">📸 Memories</h1>
+            <p class="tagline">子供の成長を、家族みんなで。</p>
+            <button id="loginButton" class="btn btn-google">
+                🔵 Googleでログイン
+            </button>
+        </div>
+    </div>
+
+    <!-- メイン画面 -->
+    <div id="mainView" class="hidden">
+        <div class="app-container">
+            <!-- ヘッダー -->
+            <header class="timeline-header">
+                <button id="childSelector" class="child-selector">
+                    <img id="childAvatar" class="child-avatar" src="" alt="">
+                    <div class="child-info">
+                        <span id="childName" class="child-name">子供を選択</span>
+                        <span id="childAge" class="child-age"></span>
+                    </div>
+                    <span class="dropdown-icon">▼</span>
+                </button>
+                <div class="header-actions">
+                    <button id="searchButton" class="header-icon-btn" title="検索">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    </button>
+                    <button id="settingsButton" class="header-icon-btn" title="設定">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- 設定メニュー -->
+            <div id="settingsMenu" class="settings-menu hidden">
+                <div class="settings-menu-content">
+                    <div class="settings-user-info">
+                        <img id="userPhotoMenu" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" src="" alt="">
+                        <span id="userNameMenu" style="font-size:14px;font-weight:600;color:var(--text-primary);"></span>
+                    </div>
+                    <button id="logoutButton" class="settings-menu-item danger">ログアウト</button>
+                </div>
+            </div>
+
+            <!-- 検索パネル -->
+            <div id="searchPanel" class="search-panel hidden">
+                <div class="search-panel-inner">
+                    <!-- 検索タブ -->
+                    <div class="search-tabs">
+                        <button class="search-tab active" data-tab="keyword">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            キーワード
+                        </button>
+                        <button class="search-tab" data-tab="yearmonth">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            年月
+                        </button>
+                        <button class="search-tab" data-tab="age">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            月齢
+                        </button>
+                    </div>
+
+                    <!-- キーワード検索 -->
+                    <div id="searchKeywordPane" class="search-pane">
+                        <div class="search-input-row">
+                            <input type="text" id="searchKeyword" class="search-input" placeholder="コメントを検索...">
+                            <button id="searchKeywordBtn" class="search-go-btn">検索</button>
+                        </div>
+                    </div>
+
+                    <!-- 年月検索 -->
+                    <div id="searchYearMonthPane" class="search-pane hidden">
+                        <div class="search-input-row">
+                            <select id="searchYear" class="search-select"></select>
+                            <span class="search-sep">年</span>
+                            <select id="searchMonth" class="search-select">
+                                <option value="">すべて</option>
+                                <option value="1">1月</option><option value="2">2月</option>
+                                <option value="3">3月</option><option value="4">4月</option>
+                                <option value="5">5月</option><option value="6">6月</option>
+                                <option value="7">7月</option><option value="8">8月</option>
+                                <option value="9">9月</option><option value="10">10月</option>
+                                <option value="11">11月</option><option value="12">12月</option>
+                            </select>
+                            <span class="search-sep">月</span>
+                            <button id="searchYearMonthBtn" class="search-go-btn">検索</button>
+                        </div>
+                    </div>
+
+                    <!-- 月齢検索 -->
+                    <div id="searchAgePane" class="search-pane hidden">
+                        <div class="search-input-row">
+                            <select id="searchAgeYear" class="search-select search-select--sm">
+                                <option value="">-</option>
+                                <option value="0">0</option><option value="1">1</option>
+                                <option value="2">2</option><option value="3">3</option>
+                                <option value="4">4</option><option value="5">5</option>
+                                <option value="6">6</option>
+                            </select>
+                            <span class="search-sep">歳</span>
+                            <select id="searchAgeMonth" class="search-select search-select--sm">
+                                <option value="">すべて</option>
+                                <option value="0">0</option><option value="1">1</option>
+                                <option value="2">2</option><option value="3">3</option>
+                                <option value="4">4</option><option value="5">5</option>
+                                <option value="6">6</option><option value="7">7</option>
+                                <option value="8">8</option><option value="9">9</option>
+                                <option value="10">10</option><option value="11">11</option>
+                            </select>
+                            <span class="search-sep">ヶ月</span>
+                            <button id="searchAgeBtn" class="search-go-btn">検索</button>
+                        </div>
+                    </div>
+
+                    <!-- 検索結果ヘッダー -->
+                    <div id="searchResultHeader" class="search-result-header hidden">
+                        <span id="searchResultCount"></span>
+                        <button id="searchClearBtn" class="search-clear-btn">✕ クリア</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 検索結果表示 -->
+            <div id="searchResults" class="search-results hidden"></div>
+
+            <!-- タイムライン -->
+            <div id="timelineView" class="timeline hidden">
+                <!-- ○年前の今日 -->
+                <div id="memoriesSection" class="memories-section hidden"></div>
+                
+                <!-- タイムライン本体（月ジャンプとのflex） -->
+                <div class="timeline-with-nav">
+                    <div id="timeline" class="timeline-content">
+                        <p style="text-align: center; color: var(--text-secondary); padding: 48px 24px;">
+                            まだ記録がありません。<br>
+                            下の「きろくする」ボタンから最初の思い出を残しましょう！
+                        </p>
+                    </div>
+                    <!-- 月ジャンプナビ -->
+                    <nav id="monthJumpNav" class="month-jump-nav hidden"></nav>
+                </div>
+            </div>
+
+            <!-- 子供選択画面 -->
+            <div id="childSelectionView" class="hidden" style="padding: 24px;">
+                <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 24px;">お子様を選択</h2>
+                <div id="childList">
+                    <p style="text-align: center; color: var(--text-secondary); padding: 48px 24px;">
+                        読み込み中...
+                    </p>
+                </div>
+                
+                <!-- 共有された子供一覧 -->
+                <div id="sharedChildrenSection" class="hidden" style="margin-top: 32px;">
+                    <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 16px; color: var(--text-secondary);">👨‍👩‍👧 共有されたお子様</h3>
+                    <div id="sharedChildList"></div>
+                </div>
+                
+                <button id="addChildButton" class="btn btn-primary w-full" style="margin-top: 24px;">
+                    + 子供を追加
+                </button>
+                <button id="joinFamilyButton" class="btn btn-secondary w-full" style="margin-top: 12px; background: var(--bg-secondary); color: var(--accent-blue); border: 1px solid var(--accent-blue);">
+                    🔗 招待コードを入力
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 投稿ボタン（フローティング） -->
+    <button id="addRecordButton" class="btn-add-record hidden">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        きろくする
+    </button>
+
+    <!-- 投稿モーダル -->
+    <div id="recordModalOverlay" class="modal-overlay"></div>
+    <div id="recordModal" class="modal">
+        <div class="modal-header">
+            <button id="closeRecordModal" class="btn-close">×</button>
+            <h2 class="modal-title">記録を追加</h2>
+            <button id="submitRecord" class="btn btn-primary"
+                style="min-height: auto; padding: 8px 16px; font-size: 14px;" disabled>投稿</button>
+        </div>
+        <div class="modal-body">
+            <!-- 写真/動画選択 -->
+            <div class="photo-selector" id="photoSelector">
+                <div class="photo-box primary">
+                    <input type="file" id="photo1" accept="image/*,video/mp4,video/quicktime,video/webm">
+                    <label for="photo1">
+                        <span class="icon">📷</span>
+                        <span class="text">写真/動画</span>
+                    </label>
+                </div>
+                <div class="photo-box">
+                    <input type="file" id="photo2" accept="image/*,video/mp4,video/quicktime,video/webm" disabled>
+                    <label for="photo2">
+                        <span class="icon">+</span>
+                    </label>
+                </div>
+                <div class="photo-box">
+                    <input type="file" id="photo3" accept="image/*,video/mp4,video/quicktime,video/webm" disabled>
+                    <label for="photo3">
+                        <span class="icon">+</span>
+                    </label>
+                </div>
+                <div class="photo-box">
+                    <input type="file" id="photo4" accept="image/*,video/mp4,video/quicktime,video/webm" disabled>
+                    <label for="photo4">
+                        <span class="icon">+</span>
+                    </label>
+                </div>
+                <div class="photo-box">
+                    <input type="file" id="photo5" accept="image/*,video/mp4,video/quicktime,video/webm" disabled>
+                    <label for="photo5">
+                        <span class="icon">+</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- コメント -->
+            <div class="input-group">
+                <label class="input-label">コメント *</label>
+                <textarea id="recordComment" class="input-textarea" placeholder="今日の様子を記録..." rows="4"></textarea>
+            </div>
+
+            <!-- 日時 -->
+            <div class="input-group">
+                <label class="input-label">日時 *</label>
+                <input type="datetime-local" id="recordDate" class="input-text">
+            </div>
+
+            <!-- カテゴリ -->
+            <div class="input-group">
+                <label class="input-label">カテゴリ *</label>
+                <div class="category-group">
+                    <button class="category-btn daily active" data-category="daily">🏠 日常</button>
+                    <button class="category-btn meal" data-category="meal">🍴 食事</button>
+                    <button class="category-btn play" data-category="play">🎨 遊び</button>
+                    <button class="category-btn outing" data-category="outing">🚗 おでかけ</button>
+                    <button class="category-btn growth" data-category="growth">🌱 成長</button>
+                </div>
+            </div>
+
+            <!-- 身長・体重（任意） -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="input-group">
+                    <label class="input-label">身長 (cm)</label>
+                    <input type="number" id="recordHeight" class="input-text" placeholder="例: 75.0" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">体重 (kg)</label>
+                    <input type="number" id="recordWeight" class="input-text" placeholder="例: 9.5" step="0.1">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細モーダル -->
+    <div id="detailModalOverlay" class="modal-overlay"></div>
+    <div id="detailModal" class="modal">
+        <div class="modal-header">
+            <button id="closeDetailModal" class="btn-close">×</button>
+            <h2 class="modal-title">記録詳細</h2>
+            <button id="editRecordBtn" class="btn btn-secondary"
+                style="min-height: auto; padding: 8px 16px; font-size: 14px;">編集</button>
+        </div>
+        <div class="modal-body">
+            <!-- 写真ギャラリー -->
+            <div id="photoGallery" class="photo-gallery">
+                <!-- 写真がここに動的に追加されます -->
+            </div>
+            <div class="photo-nav" id="photoNav">
+                <!-- ドット表示（複数の写真がある場合） -->
+            </div>
+
+            <!-- コメント -->
+            <div class="detail-section">
+                <p id="detailComment" class="detail-comment"></p>
+            </div>
+
+            <!-- メタ情報 -->
+            <div class="detail-section">
+                <div class="detail-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">日時</span>
+                        <span id="detailDate" class="meta-value"></span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">カテゴリ</span>
+                        <span id="detailCategory" class="meta-value"></span>
+                    </div>
+                    <div id="detailMeasurements" class="meta-row hidden">
+                        <span class="meta-label">成長記録</span>
+                        <span id="detailMeasurementsValue" class="meta-value"></span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">閲覧数</span>
+                        <span id="detailViewCount" class="meta-value"></span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">投稿者</span>
+                        <span id="detailAuthor" class="meta-value"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 削除ボタン -->
+            <div class="detail-section">
+                <button id="deleteRecordBtn" class="btn"
+                    style="background: #FFEBEE; color: #F44336; width: 100%;">削除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編集モーダル -->
+    <div id="editModalOverlay" class="modal-overlay"></div>
+    <div id="editModal" class="modal">
+        <div class="modal-header">
+            <button id="closeEditModal" class="btn-close">×</button>
+            <h2 class="modal-title">記録を編集</h2>
+            <button id="saveEditBtn" class="btn btn-primary"
+                style="min-height: auto; padding: 8px 16px; font-size: 14px;">保存</button>
+        </div>
+        <div class="modal-body">
+            <!-- 既存の写真 + 新しい写真選択 -->
+            <div class="photo-selector" id="editPhotoSelector">
+                <!-- 既存写真と新しい写真入力がここに動的に追加されます -->
+            </div>
+
+            <!-- コメント -->
+            <div class="input-group">
+                <label class="input-label">コメント *</label>
+                <textarea id="editComment" class="input-textarea" rows="4"></textarea>
+            </div>
+
+            <!-- 日時 -->
+            <div class="input-group">
+                <label class="input-label">日時 *</label>
+                <input type="datetime-local" id="editDate" class="input-text">
+            </div>
+
+            <!-- カテゴリ -->
+            <div class="input-group">
+                <label class="input-label">カテゴリ *</label>
+                <div class="category-group" id="editCategoryGroup">
+                    <button class="category-btn daily" data-category="daily">🏠 日常</button>
+                    <button class="category-btn meal" data-category="meal">🍴 食事</button>
+                    <button class="category-btn play" data-category="play">🎨 遊び</button>
+                    <button class="category-btn outing" data-category="outing">🚗 おでかけ</button>
+                    <button class="category-btn growth" data-category="growth">🌱 成長</button>
+                </div>
+            </div>
+
+            <!-- 身長・体重 -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="input-group">
+                    <label class="input-label">身長 (cm)</label>
+                    <input type="number" id="editHeight" class="input-text" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">体重 (kg)</label>
+                    <input type="number" id="editWeight" class="input-text" step="0.1">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 月別アルバムモーダル -->
+    <div id="albumModalOverlay" class="modal-overlay"></div>
+    <div id="albumModal" class="modal" style="max-width:540px;">
+        <div class="modal-header">
+            <button id="closeAlbumModal" class="btn-close">×</button>
+            <h2 id="albumModalTitle" class="modal-title">2026年1月</h2>
+            <span id="albumModalAge" class="month-age" style="font-size:11px;"></span>
+        </div>
+        <div class="modal-body" style="padding:12px;">
+            <div id="albumGrid" class="album-grid">
+                <!-- 写真がグリッドで入る -->
+            </div>
+            <div id="albumEmpty" class="hidden" style="text-align:center;padding:40px 16px;">
+                <div style="font-size:48px;margin-bottom:12px;">📷</div>
+                <p style="color:var(--text-secondary);font-size:14px;">この月の写真はありません</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 削除確認ダイアログ -->
+    <div id="deleteConfirmOverlay" class="modal-overlay"></div>
+    <div id="deleteConfirmDialog" class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2 class="modal-title">記録を削除</h2>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-secondary); line-height: 1.6;">この記録を削除してもよろしいですか？<br>削除した記録は復元できません。</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px;">
+                <button id="cancelDeleteBtn" class="btn"
+                    style="background: var(--bg-secondary); color: var(--text-primary);">キャンセル</button>
+                <button id="confirmDeleteBtn" class="btn" style="background: #F44336; color: white;">削除する</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 子供登録モーダル -->
+    <div id="addChildModalOverlay" class="modal-overlay"></div>
+    <div id="addChildModal" class="modal">
+        <div class="modal-header">
+            <button id="closeAddChildModal" class="btn-close">×</button>
+            <h2 class="modal-title">子供を追加</h2>
+            <button id="saveChildBtn" class="btn btn-primary"
+                style="min-height: auto; padding: 8px 16px; font-size: 14px;" disabled>保存</button>
+        </div>
+        <div class="modal-body">
+            <!-- プロフィール写真 -->
+            <div class="input-group">
+                <label class="input-label">プロフィール写真</label>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div id="childPhotoPreview"
+                        style="width: 100px; height: 100px; border-radius: 50%; background: var(--bg-secondary); border: 2px dashed var(--border-medium); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                        <span style="font-size: 40px; color: var(--text-secondary);">📷</span>
+                    </div>
+                    <div>
+                        <input type="file" id="childPhotoInput" accept="image/*" style="display: none;">
+                        <button class="btn btn-secondary" style="min-height: auto; padding: 8px 16px; font-size: 14px;"
+                            onclick="document.getElementById('childPhotoInput').click();">写真を選択</button>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">推奨: 正方形、最大5MB</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 名前 -->
+            <div class="input-group">
+                <label class="input-label">名前 *</label>
+                <input type="text" id="addChildName" class="input-text" placeholder="例: たろう">
+            </div>
+
+            <!-- 生年月日 -->
+            <div class="input-group">
+                <label class="input-label">生年月日 *</label>
+                <input type="date" id="addChildBirthDate" class="input-text">
+            </div>
+
+            <!-- 性別 -->
+            <div class="input-group">
+                <label class="input-label">性別</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                    <button class="btn gender-btn" data-gender="male"
+                        style="background: var(--bg-secondary); color: var(--text-primary);">👦 男の子</button>
+                    <button class="btn gender-btn" data-gender="female"
+                        style="background: var(--bg-secondary); color: var(--text-primary);">👧 女の子</button>
+                    <button class="btn gender-btn active" data-gender=""
+                        style="background: var(--accent-blue); color: white;">未設定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 子供編集モーダル -->
+    <div id="editChildModalOverlay" class="modal-overlay"></div>
+    <div id="editChildModal" class="modal">
+        <div class="modal-header">
+            <button id="closeEditChildModal" class="btn-close">×</button>
+            <h2 class="modal-title">子供を編集</h2>
+            <button id="updateChildBtn" class="btn btn-primary"
+                style="min-height: auto; padding: 8px 16px; font-size: 14px;" disabled>保存</button>
+        </div>
+        <div class="modal-body">
+            <!-- プロフィール写真 -->
+            <div class="input-group">
+                <label class="input-label">プロフィール写真</label>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div id="editChildPhotoPreview"
+                        style="width: 100px; height: 100px; border-radius: 50%; background: var(--bg-secondary); border: 2px dashed var(--border-medium); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                        <span style="font-size: 40px; color: var(--text-secondary);">📷</span>
+                    </div>
+                    <div>
+                        <input type="file" id="editChildPhotoInput" accept="image/*" style="display: none;">
+                        <button class="btn btn-secondary" style="min-height: auto; padding: 8px 16px; font-size: 14px;"
+                            onclick="document.getElementById('editChildPhotoInput').click();">写真を変更</button>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">推奨: 正方形、最大5MB</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 名前 -->
+            <div class="input-group">
+                <label class="input-label">名前 *</label>
+                <input type="text" id="editChildName" class="input-text">
+            </div>
+
+            <!-- 生年月日 -->
+            <div class="input-group">
+                <label class="input-label">生年月日 *</label>
+                <input type="date" id="editChildBirthDate" class="input-text">
+            </div>
+
+            <!-- 性別 -->
+            <div class="input-group">
+                <label class="input-label">性別</label>
+                <div id="editGenderGroup" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                    <button class="btn gender-btn" data-gender="male"
+                        style="background: var(--bg-secondary); color: var(--text-primary);">👦 男の子</button>
+                    <button class="btn gender-btn" data-gender="female"
+                        style="background: var(--bg-secondary); color: var(--text-primary);">👧 女の子</button>
+                    <button class="btn gender-btn" data-gender=""
+                        style="background: var(--bg-secondary); color: var(--text-primary);">未設定</button>
+                </div>
+            </div>
+
+            <!-- 家族を招待 -->
+            <div class="input-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-light);">
+                <label class="input-label">👨‍👩‍👧 家族共有</label>
+                <button id="inviteFamilyBtn" class="btn w-full"
+                    style="background: var(--accent-blue); color: white;">家族を招待</button>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px; text-align: center;">
+                    招待コードを発行して家族と共有できます
+                </p>
+            </div>
+
+            <!-- 削除ボタン -->
+            <div class="input-group" style="margin-top: 32px;">
+                <button id="deleteChildBtn" class="btn"
+                    style="background: #FFEBEE; color: #F44336; width: 100%;">子供を削除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 子供削除確認ダイアログ -->
+    <div id="deleteChildConfirmOverlay" class="modal-overlay"></div>
+    <div id="deleteChildConfirmDialog" class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2 class="modal-title">子供を削除</h2>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-secondary); line-height: 1.6;">この子供の情報を削除してもよろしいですか？<br>関連する記録もすべて削除されます。</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px;">
+                <button id="cancelDeleteChildBtn" class="btn"
+                    style="background: var(--bg-secondary); color: var(--text-primary);">キャンセル</button>
+                <button id="confirmDeleteChildBtn" class="btn" style="background: #F44336; color: white;">削除する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 招待コード入力モーダル -->
+    <div id="joinFamilyModalOverlay" class="modal-overlay"></div>
+    <div id="joinFamilyModal" class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+            <button id="closeJoinFamilyModal" class="btn-close">×</button>
+            <h2 class="modal-title">招待コードを入力</h2>
+            <span></span>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px;">
+                家族から共有された招待コードを入力すると、<br>お子様のタイムラインを一緒に見ることができます。
+            </p>
+            <div class="input-group">
+                <label class="input-label">招待コード</label>
+                <input type="text" id="inviteCodeInput" class="input-text" placeholder="例: ABC123" 
+                       style="text-transform: uppercase; letter-spacing: 2px; font-size: 18px; text-align: center;">
+            </div>
+            <button id="submitInviteCode" class="btn btn-primary w-full" style="margin-top: 16px;" disabled>
+                参加する
+            </button>
+        </div>
+    </div>
+
+    <!-- 家族を招待モーダル -->
+    <div id="inviteFamilyModalOverlay" class="modal-overlay"></div>
+    <div id="inviteFamilyModal" class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+            <button id="closeInviteFamilyModal" class="btn-close">×</button>
+            <h2 class="modal-title">家族を招待</h2>
+            <span></span>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px; text-align: center;">
+                下のコードを家族に共有してください。<br>コードを入力するとタイムラインに参加できます。
+            </p>
+            <div id="inviteCodeDisplay" style="background: var(--bg-secondary); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 16px;">
+                <div id="generatedInviteCode" style="font-size: 28px; font-weight: 700; letter-spacing: 4px; color: var(--text-primary);">
+                    読み込み中...
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+                    有効期限：<span id="inviteCodeExpiry">7日間</span>
+                </div>
+            </div>
+            <button id="copyInviteCode" class="btn btn-primary w-full" style="margin-bottom: 12px;">
+                📋 コードをコピー
+            </button>
+            <button id="shareInviteCodeLine" class="btn w-full" style="background: #06C755; color: white;">
+                💬 LINEで共有
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Firebase設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyDkvFEArJKZnRpwadvDnpHtOGTY7-yBmnU",
+            authDomain: "kids-growth-700b0.firebaseapp.com",
+            projectId: "kids-growth-700b0",
+            storageBucket: "kids-growth-700b0.firebasestorage.app",
+            messagingSenderId: "997456998341",
+            appId: "1:997456998341:web:f4b84a12968063c3bd25ac"
+        };
+
+        // Firebase初期化
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        // アプリケーション状態
+        let currentUser = null;
+        let currentChildId = null;
+
+        // ========== ユーティリティ関数 ========== //
+
+        /**
+         * トースト通知表示
+         */
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+
+            document.body.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('show'), 100);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, type === 'error' ? 3000 : 2000);
+        }
+
+        /**
+         * 年齢計算
+         */
+        function calculateAge(birthDate) {
+            if (!birthDate) return '';
+
+            const birth = birthDate.toDate ? birthDate.toDate() : new Date(birthDate);
+            const today = new Date();
+
+            let years = today.getFullYear() - birth.getFullYear();
+            let months = today.getMonth() - birth.getMonth();
+
+            if (months < 0) {
+                years--;
+                months += 12;
+            }
+
+            if (today.getDate() < birth.getDate()) {
+                months--;
+                if (months < 0) {
+                    years--;
+                    months += 12;
+                }
+            }
+
+            const totalMonths = years * 12 + months;
+
+            if (years === 0) {
+                return `${totalMonths}ヶ月`;
+            } else if (months === 0) {
+                return `${years}歳`;
+            } else {
+                return `${years}歳${months}ヶ月`;
+            }
+        }
+
+        /**
+         * 画像リサイズ
+         */
+        async function resizeImage(file, maxWidth, maxHeight, quality) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let { width, height } = img;
+                        if (width > maxWidth || height > maxHeight) {
+                            const ratio = Math.min(maxWidth / width, maxHeight / height);
+                            width *= ratio;
+                            height *= ratio;
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        canvas.toBlob(resolve, file.type, quality);
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // ========== 動画ヘルパー関数 ========== //
+
+        /**
+         * ファイルが動画かどうかを判定
+         */
+        function isVideoFile(file) {
+            const videoTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/mov'];
+            return videoTypes.includes(file.type) || /\.(mp4|mov|webm)$/i.test(file.name);
+        }
+
+        /**
+         * 動画からサムネイル画像を生成（0.5秒目のフレーム）
+         */
+        function generateVideoThumbnail(file) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.muted = true;
+                video.playsInline = true;
+
+                video.onloadeddata = () => {
+                    video.currentTime = 0.5;
+                };
+
+                video.onseeked = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.min(video.videoWidth, 640);
+                    canvas.height = Math.round(canvas.width * (video.videoHeight / video.videoWidth));
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob((blob) => {
+                        URL.revokeObjectURL(video.src);
+                        resolve(blob);
+                    }, 'image/jpeg', 0.8);
+                };
+
+                video.onerror = (e) => {
+                    URL.revokeObjectURL(video.src);
+                    reject(new Error('動画のサムネイル生成に失敗しました'));
+                };
+
+                video.src = URL.createObjectURL(file);
+            });
+        }
+
+        // ========== 認証処理 ========== //
+
+        /**
+         * 認証状態の監視
+         */
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+
+            if (user) {
+                // ログイン済み
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainView').classList.remove('hidden');
+                document.getElementById('userPhotoMenu').src = user.photoURL || '';
+                document.getElementById('userNameMenu').textContent = user.displayName || 'ユーザー';
+
+                // ユーザープロフィールを保存/更新
+                saveUserProfile(user);
+
+                // 子供一覧を読み込み
+                loadChildren(user.uid);
+            } else {
+                // 未ログイン
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('mainView').classList.add('hidden');
+            }
+        });
+
+        /**
+         * ユーザープロフィールを保存/更新
+         */
+        async function saveUserProfile(user) {
+            const userRef = db.collection('users').doc(user.uid);
+
+            try {
+                const doc = await userRef.get();
+
+                if (!doc.exists) {
+                    await userRef.set({
+                        email: user.email,
+                        displayName: user.displayName,
+                        photoURL: user.photoURL,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } else {
+                    await userRef.update({
+                        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            } catch (error) {
+                console.error('Save user profile error:', error);
+            }
+        }
+
+        /**
+         * Googleログイン
+         */
+        document.getElementById('loginButton').addEventListener('click', async () => {
+            const provider = new firebase.auth.GoogleAuthProvider();
+
+            try {
+                await auth.signInWithPopup(provider);
+                showToast('ログインしました', 'success');
+            } catch (error) {
+                console.error('Login error:', error);
+
+                let errorMessage = 'ログインに失敗しました';
+
+                if (error.code === 'auth/popup-closed-by-user') {
+                    errorMessage = 'ログインがキャンセルされました';
+                } else if (error.code === 'auth/cancelled-popup-request') {
+                    errorMessage = '複数のログイン試行を検出しました';
+                } else if (error.code === 'auth/network-request-failed') {
+                    errorMessage = 'ネットワークエラーが発生しました';
+                }
+
+                showToast(errorMessage, 'error');
+            }
+        });
+
+        /**
+         * ログアウト
+         */
+        document.getElementById('logoutButton').addEventListener('click', async () => {
+            try {
+                await auth.signOut();
+                showToast('ログアウトしました', 'success');
+            } catch (error) {
+                console.error('Logout error:', error);
+                showToast('ログアウトに失敗しました', 'error');
+            }
+        });
+
+        // ========== 子供管理 ========== //
+
+        /**
+         * 子供一覧を読み込み
+         */
+        async function loadChildren(userId) {
+            // 引数が省略された場合は現在のユーザーIDを使用
+            if (!userId && currentUser) {
+                userId = currentUser.uid;
+            }
+
+            if (!userId) {
+                console.error('loadChildren: userId is undefined');
+                return;
+            }
+            const childListEl = document.getElementById('childList');
+            const childSelectionView = document.getElementById('childSelectionView');
+
+            try {
+                // インデックス不要なクエリに変更
+                const snapshot = await db.collection('children')
+                    .where('userId', '==', userId)
+                    .orderBy('createdAt', 'desc')
+                    .get();
+
+                // クライアント側でisDeletedをフィルタリング
+                const children = snapshot.docs.filter(doc => !doc.data().isDeleted);
+
+                childListEl.innerHTML = '';
+
+
+                if (children.length === 0) {
+                    childListEl.innerHTML = `
+                        <p style="text-align: center; color: var(--text-secondary); padding: 48px 24px;">
+                            登録されたお子様はいません。<br>
+                            下のボタンから追加してください。
+                        </p>
+                    `;
+                    childSelectionView.classList.remove('hidden');
+                    return;
+                }
+
+                children.forEach(doc => {
+                    const data = doc.data();
+                    const age = calculateAge(data.birthDate);
+
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 16px; margin-bottom: 16px;';
+
+                    // 左側：情報部分（クリックで選択）
+                    const infoDiv = document.createElement('div');
+                    infoDiv.style.cssText = 'display: flex; align-items: center; gap: 16px; flex: 1; cursor: pointer;';
+                    infoDiv.onclick = () => selectChild(doc.id, data);
+                    
+                    // photoURL を優先（ほとんどのデータがphotoURLで保存されている）
+                    let photoURL = data.photoURL || data.profilePhotoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23E0E0E0"/><text x="50" y="55" text-anchor="middle" fill="%239E9E9E" font-size="40">👤</text></svg>';
+                    
+                    infoDiv.innerHTML = `
+                        <img src="${photoURL}" 
+                             style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-medium);">
+                        <div>
+                            <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${data.name}</div>
+                            <div style="font-size: 14px; color: var(--text-secondary);">${age}</div>
+                        </div>
+                    `;
+
+                    // 右側：編集ボタン
+                    const editBtn = document.createElement('button');
+                    editBtn.innerHTML = '✏️';
+                    editBtn.style.cssText = 'background: none; border: none; font-size: 20px; cursor: pointer; padding: 8px; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;';
+                    editBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        openEditChildModal(doc.id);
+                    };
+                    editBtn.onmouseover = () => editBtn.style.background = 'var(--bg-secondary)';
+                    editBtn.onmouseout = () => editBtn.style.background = 'none';
+
+                    card.appendChild(infoDiv);
+                    card.appendChild(editBtn);
+                    childListEl.appendChild(card);
+                });
+
+                // 子供選択画面を表示
+                childSelectionView.classList.remove('hidden');
+
+                // 「+ 子供を追加」ボタンのイベントリスナー設定（画面表示後）
+                setTimeout(() => {
+                    const addChildBtn = document.getElementById('addChildButton');
+                    if (addChildBtn && !addChildBtn.hasAttribute('data-listener-added')) {
+                        addChildBtn.addEventListener('click', openAddChildModal);
+                        addChildBtn.setAttribute('data-listener-added', 'true');
+                    }
+                }, 100);
+                
+                // 共有された子供も読み込む
+                await loadSharedChildren(userId);
+                
+            } catch (error) {
+                console.error('Load children error:', error);
+                childListEl.innerHTML = `<p style="color: #F44336; text-align: center;">エラー: ${error.message}</p>`;
+            }
+        }
+
+        /**
+         * 共有された子供一覧を読み込み
+         */
+        async function loadSharedChildren(userId) {
+            const sharedSection = document.getElementById('sharedChildrenSection');
+            const sharedListEl = document.getElementById('sharedChildList');
+            
+            if (!sharedSection || !sharedListEl) return;
+            
+            try {
+                // 自分が招待されている共有を取得
+                const sharesSnapshot = await db.collection('familyShares')
+                    .where('sharedUserId', '==', userId)
+                    .get();
+                
+                // クライアント側でアクティブなものをフィルタリング
+                const activeShares = sharesSnapshot.docs.filter(doc => doc.data().isActive);
+                
+                if (activeShares.length === 0) {
+                    sharedSection.classList.add('hidden');
+                    return;
+                }
+                
+                sharedListEl.innerHTML = '';
+                let hasValidShares = false;
+                
+                for (const shareDoc of activeShares) {
+                    const shareData = shareDoc.data();
+                    
+                    // 子供情報を取得
+                    const childDoc = await db.collection('children').doc(shareData.childId).get();
+                    
+                    if (!childDoc.exists || childDoc.data().isDeleted) continue;
+                    
+                    hasValidShares = true;
+                    const childData = childDoc.data();
+                    const age = calculateAge(childData.birthDate);
+                    
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.style.cssText = 'display: flex; align-items: center; padding: 16px; margin-bottom: 12px; cursor: pointer; border-left: 4px solid var(--accent-blue);';
+                    card.onclick = () => selectChild(childDoc.id, childData);
+                    
+                    let photoURL = childData.photoURL || childData.profilePhotoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23E0E0E0"/><text x="50" y="55" text-anchor="middle" fill="%239E9E9E" font-size="40">👤</text></svg>';
+                    
+                    card.innerHTML = `
+                        <img src="${photoURL}" 
+                             style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-medium);">
+                        <div style="margin-left: 16px; flex: 1;">
+                            <div style="font-size: 16px; font-weight: 600; color: var(--text-primary);">${childData.name}</div>
+                            <div style="font-size: 13px; color: var(--text-secondary);">${age}</div>
+                        </div>
+                        <span style="font-size: 12px; color: var(--accent-blue); background: var(--accent-blue)15; padding: 4px 8px; border-radius: 4px;">共有</span>
+                    `;
+                    
+                    sharedListEl.appendChild(card);
+                }
+                
+                if (hasValidShares) {
+                    sharedSection.classList.remove('hidden');
+                } else {
+                    sharedSection.classList.add('hidden');
+                }
+                
+            } catch (error) {
+                console.error('Load shared children error:', error);
+                sharedSection.classList.add('hidden');
+            }
+        }
+
+        /**
+         * 子供を選択
+         */
+        let currentChildBirthDate = null;
+
+        function selectChild(childId, childData) {
+            currentChildId = childId;
+            currentChildBirthDate = childData.birthDate || null;
+
+            // ヘッダーに表示（profilePhotoURL と photoURL の両方に対応）
+            let headerPhotoURL = childData.photoURL || childData.profilePhotoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23E0E0E0"/><text x="50" y="55" text-anchor="middle" fill="%239E9E9E" font-size="40">👤</text></svg>';
+            document.getElementById('childAvatar').src = headerPhotoURL;
+            document.getElementById('childName').textContent = childData.name;
+            
+            // 月齢を表示
+            const age = calculateAge(childData.birthDate);
+            document.getElementById('childAge').textContent = age;
+
+            // 子供選択画面を非表示、タイムラインを表示
+            document.getElementById('childSelectionView').classList.add('hidden');
+            document.getElementById('timelineView').classList.remove('hidden');
+            document.getElementById('addRecordButton').classList.remove('hidden');
+
+            // タイムライン読み込み
+            loadTimeline(childId);
+        }
+
+        /**
+         * タイムラインを読み込み
+         */
+        async function loadTimeline(childId) {
+            const timelineEl = document.getElementById('timeline');
+
+            timelineEl.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 48px 24px;">読み込み中...</p>';
+
+            try {
+                // インデックス不要なクエリに変更
+                const snapshot = await db.collection('records')
+                    .where('childId', '==', childId)
+                    .orderBy('recordDate', 'desc')
+                    .limit(50)  // 削除済みを除外するため多めに取得
+                    .get();
+
+                // クライアント側でisDeletedをフィルタリング
+                const records = snapshot.docs
+                    .filter(doc => !doc.data().isDeleted)
+                    .slice(0, 20);  // 最大20件
+
+
+                if (records.length === 0) {
+                    timelineEl.innerHTML = `
+                        <div style="text-align:center; padding:80px 24px;">
+                            <div style="font-size:64px; margin-bottom:16px;">📸</div>
+                            <p style="font-size:18px; font-weight:700; color:var(--text-primary); margin-bottom:8px;">まだ記録がありません</p>
+                            <p style="font-size:14px; color:var(--text-secondary); line-height:1.6;">下の「きろくする」ボタンから<br>最初の思い出を残しましょう</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                timelineEl.innerHTML = '';
+
+                // 月ごとにグループ化
+                const recordsByMonth = {};
+
+                records.forEach(doc => {
+                    const data = doc.data();
+                    const date = data.recordDate.toDate();
+                    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+                    if (!recordsByMonth[monthKey]) {
+                        recordsByMonth[monthKey] = [];
+                    }
+
+                    recordsByMonth[monthKey].push({
+                        id: doc.id,
+                        ...data
+                    });
+                });
+
+                // 描画
+                Object.entries(recordsByMonth).forEach(([month, records]) => {
+                    // 月ヘッダー
+                    const [year, monthNum] = month.split('-');
+                    
+                    // その月時点での月齢を計算
+                    let monthAgeText = '';
+                    if (currentChildBirthDate) {
+                        const birth = currentChildBirthDate.toDate ? currentChildBirthDate.toDate() : new Date(currentChildBirthDate);
+                        const monthDate = new Date(parseInt(year), parseInt(monthNum) - 1, 15);
+                        let ageYears = monthDate.getFullYear() - birth.getFullYear();
+                        let ageMonths = monthDate.getMonth() - birth.getMonth();
+                        if (ageMonths < 0) { ageYears--; ageMonths += 12; }
+                        if (ageYears <= 0 && ageMonths <= 0) {
+                            monthAgeText = '';
+                        } else if (ageYears === 0) {
+                            monthAgeText = `${ageMonths}ヶ月`;
+                        } else if (ageMonths === 0) {
+                            monthAgeText = `${ageYears}歳`;
+                        } else {
+                            monthAgeText = `${ageYears}歳${ageMonths}ヶ月`;
+                        }
+                    }
+                    
+                    const monthHeader = document.createElement('div');
+                    monthHeader.className = 'month-header';
+                    monthHeader.id = `month-${month}`;
+                    monthHeader.innerHTML = `
+                        <div class="month-header-left">
+                            <span class="month-marker">◉</span>
+                            <span class="month-text">${year}年${parseInt(monthNum)}月</span>
+                        </div>
+                        <div class="month-header-right">
+                            ${monthAgeText ? `<span class="month-age">${monthAgeText}</span>` : ''}
+                            <button class="month-album-btn" data-year="${year}" data-month="${monthNum}" data-age="${monthAgeText}" title="アルバム表示">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                            </button>
+                        </div>
+                    `;
+                    timelineEl.appendChild(monthHeader);
+
+                    // 記録カード
+                    records.forEach(record => {
+                        const card = createRecordCard(record);
+                        timelineEl.appendChild(card);
+                    });
+                });
+                
+                // 月ジャンプナビを生成
+                buildMonthJumpNav(Object.keys(recordsByMonth));
+                
+                // ○年前の今日をロード
+                loadMemories(childId);
+                
+            } catch (error) {
+                console.error('Load timeline error:', error);
+                timelineEl.innerHTML = `<p style="color: #F44336; text-align: center;">エラー: ${error.message}</p>`;
+            }
+        }
+
+        /**
+         * 月ジャンプナビを生成
+         */
+        function buildMonthJumpNav(monthKeys) {
+            const nav = document.getElementById('monthJumpNav');
+            if (!nav) return;
+            
+            if (monthKeys.length <= 1) {
+                nav.classList.add('hidden');
+                return;
+            }
+            
+            nav.classList.remove('hidden');
+            nav.innerHTML = '';
+            
+            monthKeys.forEach((key, idx) => {
+                const [y, m] = key.split('-');
+                const dot = document.createElement('button');
+                dot.className = 'month-jump-item';
+                dot.dataset.monthKey = key;
+                dot.innerHTML = `<span class="month-jump-label">${parseInt(m)}月</span>`;
+                dot.title = `${y}年${parseInt(m)}月`;
+                dot.addEventListener('click', () => {
+                    const target = document.getElementById(`month-${key}`);
+                    if (target) {
+                        // ヘッダー分のオフセット（56px）を考慮
+                        const headerOffset = 60;
+                        const targetPosition = target.getBoundingClientRect().top + window.scrollY - headerOffset;
+                        window.scrollTo({ top: targetPosition, behavior: 'smooth' });
+                    }
+                    // アクティブ表示
+                    nav.querySelectorAll('.month-jump-item').forEach(d => d.classList.remove('active'));
+                    dot.classList.add('active');
+                });
+                
+                // 最初の月をアクティブに
+                if (idx === 0) dot.classList.add('active');
+                nav.appendChild(dot);
+            });
+        }
+
+        /**
+         * ○年前の今日の記録をロード
+         */
+        async function loadMemories(childId) {
+            const section = document.getElementById('memoriesSection');
+            if (!section) return;
+            
+            section.classList.add('hidden');
+            section.innerHTML = '';
+            
+            const today = new Date();
+            const todayMonth = today.getMonth();
+            const todayDate = today.getDate();
+            
+            try {
+                // loadTimelineと同じパターン: isDeletedはクライアント側でフィルタ
+                const snapshot = await db.collection('records')
+                    .where('childId', '==', childId)
+                    .orderBy('recordDate', 'desc')
+                    .limit(300)
+                    .get();
+                
+                const memories = [];
+                
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (data.isDeleted) return;
+                    
+                    const recordDate = data.recordDate.toDate();
+                    const recYear = recordDate.getFullYear();
+                    
+                    // 今年の記録はスキップ
+                    if (recYear >= today.getFullYear()) return;
+                    
+                    const recMonth = recordDate.getMonth();
+                    const recDate = recordDate.getDate();
+                    const yearsAgo = today.getFullYear() - recYear;
+                    
+                    // 完全に同じ月日
+                    if (recMonth === todayMonth && recDate === todayDate) {
+                        memories.push({ id: doc.id, yearsAgo, dayDiff: 0, ...data });
+                        return;
+                    }
+                    
+                    // 前後1日を正確に計算
+                    const todayThisYear = new Date(recYear, todayMonth, todayDate);
+                    const diffMs = Math.abs(recordDate.getTime() - todayThisYear.getTime());
+                    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays <= 2) {
+                        memories.push({ id: doc.id, yearsAgo, dayDiff: diffDays, ...data });
+                    }
+                });
+                
+                if (memories.length === 0) return;
+                
+                // 完全一致を優先、次に近い日
+                memories.sort((a, b) => a.dayDiff - b.dayDiff || a.yearsAgo - b.yearsAgo);
+                
+                // 年ごとにグループ化
+                const byYear = {};
+                memories.forEach(m => {
+                    if (!byYear[m.yearsAgo]) byYear[m.yearsAgo] = [];
+                    if (byYear[m.yearsAgo].length < 3) {
+                        byYear[m.yearsAgo].push(m);
+                    }
+                });
+                
+                // 描画
+                section.classList.remove('hidden');
+                
+                const wrapper = document.createElement('div');
+                wrapper.className = 'memories-wrapper';
+                
+                const header = document.createElement('div');
+                header.className = 'memories-header';
+                header.innerHTML = `
+                    <span class="memories-icon">🕰️</span>
+                    <span class="memories-title">思い出のふりかえり</span>
+                `;
+                wrapper.appendChild(header);
+                
+                const scrollContainer = document.createElement('div');
+                scrollContainer.className = 'memories-scroll';
+                
+                Object.entries(byYear).sort((a, b) => parseInt(a[0]) - parseInt(b[0])).forEach(([yearsAgo, recs]) => {
+                    recs.forEach(record => {
+                        const card = document.createElement('div');
+                        card.className = 'memory-card';
+                        card.dataset.recordId = record.id;
+                        
+                        const hasPhoto = record.photos && record.photos.length > 0;
+                        const date = record.recordDate.toDate();
+                        const dateStr = `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`;
+                        
+                        // 月齢も表示
+                        let ageAtTime = '';
+                        if (currentChildBirthDate) {
+                            const birth = currentChildBirthDate.toDate ? currentChildBirthDate.toDate() : new Date(currentChildBirthDate);
+                            let ay = date.getFullYear() - birth.getFullYear();
+                            let am = date.getMonth() - birth.getMonth();
+                            if (am < 0) { ay--; am += 12; }
+                            if (ay > 0) {
+                                ageAtTime = am > 0 ? `${ay}歳${am}ヶ月` : `${ay}歳`;
+                            } else if (am > 0) {
+                                ageAtTime = `${am}ヶ月`;
+                            }
+                        }
+                        
+                        card.innerHTML = `
+                            <div class="memory-card-badge">${yearsAgo}年前の今日</div>
+                            ${hasPhoto ? `
+                                <div class="memory-card-photo">
+                                    <img src="${record.photos[0].type === 'video' ? (record.photos[0].thumbnailURL || record.photos[0].photoURL) : record.photos[0].photoURL}" alt="" loading="lazy">
+                                    ${record.photos[0].type === 'video' ? '<span class="video-play-badge video-play-badge--small">▶</span>' : ''}
+                                </div>
+                            ` : `
+                                <div class="memory-card-nophoto">
+                                    <span style="font-size:32px;">📝</span>
+                                </div>
+                            `}
+                            <div class="memory-card-info">
+                                <p class="memory-card-comment">${escapeHtmlGlobal(record.comment || '')}</p>
+                                <div class="memory-card-meta">
+                                    <span class="memory-card-date">${dateStr}</span>
+                                    ${ageAtTime ? `<span class="memory-card-age">${ageAtTime}</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                        
+                        card.addEventListener('click', () => {
+                            showRecordDetail(record.id);
+                        });
+                        
+                        scrollContainer.appendChild(card);
+                    });
+                });
+                
+                wrapper.appendChild(scrollContainer);
+                section.appendChild(wrapper);
+                
+            } catch (error) {
+                console.error('Load memories error:', error);
+            }
+        }
+        
+        // グローバルなHTMLエスケープ関数
+        function escapeHtmlGlobal(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        /**
+         * 月別アルバムを表示
+         */
+        async function openMonthAlbum(year, month, ageText) {
+            const overlay = document.getElementById('albumModalOverlay');
+            const modal = document.getElementById('albumModal');
+            const grid = document.getElementById('albumGrid');
+            const empty = document.getElementById('albumEmpty');
+            const title = document.getElementById('albumModalTitle');
+            const ageEl = document.getElementById('albumModalAge');
+            
+            title.textContent = `${year}年${parseInt(month)}月`;
+            ageEl.textContent = ageText || '';
+            grid.innerHTML = `
+                <div style="grid-column:1/-1;text-align:center;padding:40px;">
+                    <div class="spinner" style="margin:0 auto;"></div>
+                </div>
+            `;
+            empty.classList.add('hidden');
+            
+            overlay.classList.add('show');
+            setTimeout(() => modal.classList.add('show'), 50);
+            
+            try {
+                // childId + recordDate(範囲) は既存のインデックスで対応可能
+                const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+                const endDate = new Date(parseInt(year), parseInt(month), 1);
+                
+                const snapshot = await db.collection('records')
+                    .where('childId', '==', currentChildId)
+                    .where('recordDate', '>=', firebase.firestore.Timestamp.fromDate(startDate))
+                    .where('recordDate', '<', firebase.firestore.Timestamp.fromDate(endDate))
+                    .orderBy('recordDate', 'desc')
+                    .get();
+                
+                const records = snapshot.docs
+                    .filter(doc => !doc.data().isDeleted)
+                    .map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                grid.innerHTML = '';
+                
+                if (records.length === 0) {
+                    empty.classList.remove('hidden');
+                    return;
+                }
+                
+                // 写真ありの記録のみ抽出
+                const photoRecords = records.filter(r => r.photos && r.photos.length > 0);
+                const textRecords = records.filter(r => !r.photos || r.photos.length === 0);
+                
+                if (photoRecords.length === 0 && textRecords.length === 0) {
+                    empty.classList.remove('hidden');
+                    return;
+                }
+                
+                // 写真グリッド — 各写真に日付オーバーレイ付き
+                photoRecords.forEach(record => {
+                    const recDate = record.recordDate.toDate();
+                    const dayStr = `${recDate.getMonth()+1}/${recDate.getDate()}`;
+                    
+                    record.photos.forEach((photo, idx) => {
+                        const item = document.createElement('div');
+                        item.className = 'album-grid-item';
+                        const imgSrc = photo.type === 'video' ? (photo.thumbnailURL || photo.photoURL) : photo.photoURL;
+                        item.innerHTML = `
+                            <img src="${imgSrc}" alt="" loading="lazy">
+                            ${photo.type === 'video' ? '<span class="video-play-badge video-play-badge--small">▶</span>' : ''}
+                            <span class="album-grid-date">${dayStr}</span>
+                        `;
+                        item.addEventListener('click', () => showRecordDetail(record.id));
+                        grid.appendChild(item);
+                    });
+                });
+                
+                // テキストのみ記録
+                textRecords.forEach(record => {
+                    const categories = {
+                        daily: { icon: '🏠', color: '#9E9E9E' },
+                        meal: { icon: '🍴', color: '#FF9800' },
+                        play: { icon: '🎨', color: '#E91E63' },
+                        outing: { icon: '🚗', color: '#2196F3' },
+                        growth: { icon: '🌱', color: '#4CAF50' }
+                    };
+                    const cat = categories[record.category] || categories.daily;
+                    const item = document.createElement('div');
+                    item.className = 'album-grid-item album-grid-item--text';
+                    item.style.background = cat.color + '12';
+                    item.innerHTML = `
+                        <span style="font-size:28px;">${cat.icon}</span>
+                        <p class="album-grid-text">${escapeHtmlGlobal(record.comment || '')}</p>
+                    `;
+                    item.addEventListener('click', () => showRecordDetail(record.id));
+                    grid.appendChild(item);
+                });
+                
+                // 件数サマリー
+                const totalPhotos = photoRecords.reduce((n, r) => n + r.photos.length, 0);
+                const countEl = document.createElement('div');
+                countEl.className = 'album-count';
+                countEl.textContent = `記録 ${records.length}件 · 写真 ${totalPhotos}枚`;
+                grid.appendChild(countEl);
+                
+            } catch (error) {
+                console.error('Album load error:', error);
+                grid.innerHTML = `<p style="color:#F44336;text-align:center;padding:24px;">読み込みに失敗しました</p>`;
+            }
+        }
+
+        /**
+         * 記録カードを作成
+         */
+        var createRecordCard = function(record) {
+            const escapeHtml = (text) => {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            };
+            
+            const article = document.createElement('article');
+            article.dataset.recordId = record.id;
+
+            const hasPhotos = record.photos && record.photos.length > 0;
+            
+            const categories = {
+                daily: { label: '日常', icon: '🏠', color: '#9E9E9E' },
+                meal: { label: '食事', icon: '🍴', color: '#FF9800' },
+                play: { label: '遊び', icon: '🎨', color: '#E91E63' },
+                outing: { label: 'おでかけ', icon: '🚗', color: '#2196F3' },
+                growth: { label: '成長', icon: '🌱', color: '#4CAF50' }
+            };
+            const category = categories[record.category] || categories.daily;
+
+            const date = record.recordDate.toDate();
+            const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+            if (hasPhotos) {
+                const firstPhoto = record.photos[0];
+                const isFirstVideo = firstPhoto.type === 'video';
+                const heroSrc = isFirstVideo ? (firstPhoto.thumbnailURL || firstPhoto.photoURL) : firstPhoto.photoURL;
+                const hasVideoInPhotos = record.photos.some(p => p.type === 'video');
+
+                article.className = 'record-card record-card--photo';
+                article.innerHTML = `
+                    <div class="record-photo-hero">
+                        <img src="${heroSrc}" alt="" loading="lazy">
+                        ${hasVideoInPhotos ? '<span class="video-play-badge">▶</span>' : ''}
+                        ${record.photos.length > 1 ? `<span class="photo-count">📷 ${record.photos.length}枚</span>` : ''}
+                        <div class="record-photo-overlay">
+                            <p class="record-comment-overlay">${escapeHtml(record.comment)}</p>
+                            <div class="record-meta-overlay">
+                                <span class="record-date-overlay">${dateStr}</span>
+                                <span class="record-category-pill" style="background:${category.color}22;color:${category.color};border:1px solid ${category.color}44;">${category.icon} ${category.label}</span>
+                                ${record.heightCm || record.weightKg ? `
+                                    <span class="record-measurements-overlay">
+                                        ${record.heightCm ? `${record.heightCm}cm` : ''}${record.heightCm && record.weightKg ? ' · ' : ''}${record.weightKg ? `${record.weightKg}kg` : ''}
+                                    </span>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                article.className = 'record-card record-card--text';
+                article.innerHTML = `
+                    <div class="record-text-icon" style="background:${category.color}15;color:${category.color};">
+                        <span>${category.icon}</span>
+                    </div>
+                    <div class="record-text-content">
+                        <p class="record-comment-text">${escapeHtml(record.comment)}</p>
+                        <div class="record-meta-text">
+                            <span>${dateStr}</span>
+                            <span class="record-category-pill" style="background:${category.color}22;color:${category.color};border:1px solid ${category.color}44;">${category.icon} ${category.label}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return article;
+        };
+
+        // ========== 子供選択ヘッダークリック ========== //
+
+        // ========== 検索機能 ========== //
+        
+        // 検索パネルのトグル
+        document.getElementById('searchButton').addEventListener('click', () => {
+            const panel = document.getElementById('searchPanel');
+            const results = document.getElementById('searchResults');
+            const timeline = document.getElementById('timelineView');
+            const isHidden = panel.classList.contains('hidden');
+            
+            if (isHidden) {
+                panel.classList.remove('hidden');
+                // キーワード入力にフォーカス
+                setTimeout(() => document.getElementById('searchKeyword').focus(), 200);
+            } else {
+                panel.classList.add('hidden');
+                results.classList.add('hidden');
+                timeline.classList.remove('hidden');
+                document.getElementById('searchResultHeader').classList.add('hidden');
+            }
+        });
+        
+        // タブ切替
+        document.querySelectorAll('.search-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                document.querySelectorAll('.search-pane').forEach(p => p.classList.add('hidden'));
+                const paneId = 'search' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1) + 'Pane';
+                // keyword -> searchKeywordPane, yearmonth -> searchYearmonthPane, age -> searchAgePane
+                const paneMap = {
+                    'keyword': 'searchKeywordPane',
+                    'yearmonth': 'searchYearMonthPane',
+                    'age': 'searchAgePane'
+                };
+                document.getElementById(paneMap[tab.dataset.tab]).classList.remove('hidden');
+            });
+        });
+        
+        // 年セレクトの初期化
+        function initSearchYearSelect() {
+            const select = document.getElementById('searchYear');
+            const currentYear = new Date().getFullYear();
+            select.innerHTML = '';
+            for (let y = currentYear; y >= currentYear - 10; y--) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                select.appendChild(opt);
+            }
+        }
+        initSearchYearSelect();
+        
+        // Enter キーでキーワード検索
+        document.getElementById('searchKeyword').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') executeSearch('keyword');
+        });
+        
+        // 検索ボタン
+        document.getElementById('searchKeywordBtn').addEventListener('click', () => executeSearch('keyword'));
+        document.getElementById('searchYearMonthBtn').addEventListener('click', () => executeSearch('yearmonth'));
+        document.getElementById('searchAgeBtn').addEventListener('click', () => executeSearch('age'));
+        
+        // クリアボタン
+        document.getElementById('searchClearBtn').addEventListener('click', () => {
+            document.getElementById('searchResults').classList.add('hidden');
+            document.getElementById('searchResultHeader').classList.add('hidden');
+            document.getElementById('timelineView').classList.remove('hidden');
+            document.getElementById('searchKeyword').value = '';
+        });
+        
+        /**
+         * 検索実行
+         */
+        async function executeSearch(type) {
+            if (!currentChildId) return;
+            
+            const resultsEl = document.getElementById('searchResults');
+            const headerEl = document.getElementById('searchResultHeader');
+            const countEl = document.getElementById('searchResultCount');
+            const timelineView = document.getElementById('timelineView');
+            
+            // ローディング
+            resultsEl.classList.remove('hidden');
+            resultsEl.innerHTML = `
+                <div style="text-align:center;padding:48px;">
+                    <div class="spinner" style="margin:0 auto;"></div>
+                    <p style="margin-top:12px;color:var(--text-secondary);font-size:13px;">検索中...</p>
+                </div>
+            `;
+            timelineView.classList.add('hidden');
+            headerEl.classList.remove('hidden');
+            
+            try {
+                // 全件取得（既存パターンに合わせる）
+                const snapshot = await db.collection('records')
+                    .where('childId', '==', currentChildId)
+                    .orderBy('recordDate', 'desc')
+                    .limit(500)
+                    .get();
+                
+                const allRecords = snapshot.docs
+                    .filter(doc => !doc.data().isDeleted)
+                    .map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                let filtered = [];
+                let searchLabel = '';
+                
+                if (type === 'keyword') {
+                    const keyword = document.getElementById('searchKeyword').value.trim().toLowerCase();
+                    if (!keyword) {
+                        resultsEl.classList.add('hidden');
+                        headerEl.classList.add('hidden');
+                        timelineView.classList.remove('hidden');
+                        return;
+                    }
+                    filtered = allRecords.filter(r => 
+                        (r.comment || '').toLowerCase().includes(keyword)
+                    );
+                    searchLabel = `「${keyword}」`;
+                    
+                } else if (type === 'yearmonth') {
+                    const year = parseInt(document.getElementById('searchYear').value);
+                    const month = document.getElementById('searchMonth').value;
+                    
+                    filtered = allRecords.filter(r => {
+                        const d = r.recordDate.toDate();
+                        if (d.getFullYear() !== year) return false;
+                        if (month && (d.getMonth() + 1) !== parseInt(month)) return false;
+                        return true;
+                    });
+                    searchLabel = month ? `${year}年${month}月` : `${year}年`;
+                    
+                } else if (type === 'age') {
+                    const ageYear = document.getElementById('searchAgeYear').value;
+                    const ageMonth = document.getElementById('searchAgeMonth').value;
+                    
+                    if (ageYear === '' && ageMonth === '') {
+                        resultsEl.classList.add('hidden');
+                        headerEl.classList.add('hidden');
+                        timelineView.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    if (!currentChildBirthDate) {
+                        showToast('誕生日が設定されていません', 'error');
+                        resultsEl.classList.add('hidden');
+                        headerEl.classList.add('hidden');
+                        timelineView.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    const birth = currentChildBirthDate.toDate ? currentChildBirthDate.toDate() : new Date(currentChildBirthDate);
+                    
+                    filtered = allRecords.filter(r => {
+                        const d = r.recordDate.toDate();
+                        let ay = d.getFullYear() - birth.getFullYear();
+                        let am = d.getMonth() - birth.getMonth();
+                        if (am < 0) { ay--; am += 12; }
+                        if (d.getDate() < birth.getDate()) {
+                            am--;
+                            if (am < 0) { ay--; am += 12; }
+                        }
+                        
+                        if (ageYear !== '' && ay !== parseInt(ageYear)) return false;
+                        if (ageMonth !== '' && am !== parseInt(ageMonth)) return false;
+                        return true;
+                    });
+                    
+                    if (ageYear !== '' && ageMonth !== '') {
+                        searchLabel = `${ageYear}歳${ageMonth}ヶ月`;
+                    } else if (ageYear !== '') {
+                        searchLabel = `${ageYear}歳`;
+                    } else {
+                        searchLabel = `${ageMonth}ヶ月`;
+                    }
+                }
+                
+                // 結果を表示
+                countEl.textContent = `${searchLabel}：${filtered.length}件`;
+                resultsEl.innerHTML = '';
+                
+                if (filtered.length === 0) {
+                    resultsEl.innerHTML = `
+                        <div style="text-align:center;padding:60px 24px;">
+                            <div style="font-size:48px;margin-bottom:12px;">🔍</div>
+                            <p style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">見つかりませんでした</p>
+                            <p style="font-size:13px;color:var(--text-secondary);">条件を変えて試してみてください</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // カード描画
+                filtered.forEach(record => {
+                    const card = createRecordCard(record);
+                    resultsEl.appendChild(card);
+                });
+                
+                // スクロールを先頭に
+                resultsEl.scrollTop = 0;
+                
+            } catch (error) {
+                console.error('Search error:', error);
+                resultsEl.innerHTML = `<p style="color:#F44336;text-align:center;padding:24px;">検索に失敗しました</p>`;
+            }
+        }
+
+        // ========== 設定メニュー ========== //
+        document.getElementById('settingsButton').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const menu = document.getElementById('settingsMenu');
+            menu.classList.toggle('hidden');
+        });
+
+        // メニュー外クリックで閉じる
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('settingsMenu');
+            if (!menu.classList.contains('hidden') && !e.target.closest('.settings-menu') && !e.target.closest('#settingsButton')) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // ========== 月別アルバム ========== //
+        // 月アルバムボタンのクリック（イベント委譲）
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.month-album-btn');
+            if (btn) {
+                e.stopPropagation();
+                const year = btn.dataset.year;
+                const month = btn.dataset.month;
+                const age = btn.dataset.age;
+                openMonthAlbum(year, month, age);
+            }
+        });
+        
+        // 月別アルバムモーダルを閉じる
+        function closeAlbumModal() {
+            const modal = document.getElementById('albumModal');
+            const overlay = document.getElementById('albumModalOverlay');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.classList.remove('show'), 300);
+        }
+        
+        document.getElementById('closeAlbumModal').addEventListener('click', closeAlbumModal);
+        document.getElementById('albumModalOverlay').addEventListener('click', closeAlbumModal);
+
+        document.getElementById('childSelector').addEventListener('click', () => {
+            if (currentUser) {
+                document.getElementById('timelineView').classList.add('hidden');
+                document.getElementById('addRecordButton').classList.add('hidden');
+                document.getElementById('childSelectionView').classList.remove('hidden');
+                loadChildren(currentUser.uid);
+            }
+        });
+
+        // ========== 投稿モーダル ========== //
+
+        let selectedPhotos = [];
+        let selectedCategory = 'daily';
+
+        // モーダル開く
+        document.getElementById('addRecordButton').addEventListener('click', () => {
+            const modal = document.getElementById('recordModal');
+            const overlay = document.getElementById('recordModalOverlay');
+
+            overlay.classList.add('show');
+            setTimeout(() => modal.classList.add('show'), 100);
+
+            // 日時のデフォルト値を設定
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('recordDate').value = now.toISOString().slice(0, 16);
+
+            // 関数定義（クロージャとして機能させるためここに定義）
+            function updateSubmitButton() {
+                const comment = document.getElementById('recordComment').value.trim();
+                const hasPhotos = selectedPhotos.filter(p => p).length > 0;
+                const submitBtn = document.getElementById('submitRecord');
+                if (submitBtn) submitBtn.disabled = !comment || !hasPhotos;
+            }
+
+            function closeRecordModal() {
+                modal.classList.remove('show');
+                setTimeout(() => overlay.classList.remove('show'), 300);
+
+                // リセット
+                selectedPhotos = [];
+                selectedCategory = 'daily';
+                document.getElementById('recordComment').value = '';
+                document.getElementById('recordHeight').value = '';
+                document.getElementById('recordWeight').value = '';
+
+                // 写真をクリア
+                for (let i = 1; i <= 5; i++) {
+                    const input = document.getElementById(`photo${i}`);
+                    if (input) {
+                        input.value = '';
+                        input.disabled = i > 1;
+                        const box = input.closest('.photo-box');
+                        const preview = box.querySelector('img.preview');
+                        if (preview) preview.remove();
+                        const removeBtn = box.querySelector('.remove-btn');
+                        if (removeBtn) removeBtn.remove();
+                    }
+                }
+                updateSubmitButton();
+            }
+
+
+
+            // イベントリスナー設定（重複防止）
+            if (!modal.hasAttribute('data-listeners-initialized')) {
+                // モーダルを閉じる
+                document.getElementById('closeRecordModal').addEventListener('click', closeRecordModal);
+                document.getElementById('recordModalOverlay').addEventListener('click', closeRecordModal);
+
+                // カテゴリ選択
+                document.querySelectorAll('.category-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        selectedCategory = btn.dataset.category;
+                    });
+                });
+
+                // 写真選択
+                for (let i = 1; i <= 5; i++) {
+                    const input = document.getElementById(`photo${i}`);
+
+                    input.addEventListener('change', async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+
+                        const isVideo = isVideoFile(file);
+
+                        // バリデーション
+                        if (isVideo) {
+                            if (file.size > 100 * 1024 * 1024) {
+                                showToast('動画は100MB以下にしてください', 'error');
+                                input.value = '';
+                                return;
+                            }
+                        } else {
+                            if (file.size > 5 * 1024 * 1024) {
+                                showToast('画像は5MB以下にしてください', 'error');
+                                input.value = '';
+                                return;
+                            }
+                            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                            if (!allowedTypes.includes(file.type)) {
+                                showToast('JPEG、PNG、WebP形式の画像、またはMP4、MOV、WebM形式の動画をアップロードできます', 'error');
+                                input.value = '';
+                                return;
+                            }
+                        }
+
+                        // プレビュー表示
+                        const box = input.closest('.photo-box');
+                        const label = box.querySelector('label');
+
+                        // 既存のプレビューを削除
+                        const existingPreview = box.querySelector('img.preview');
+                        if (existingPreview) existingPreview.remove();
+                        const existingVideoIcon = box.querySelector('.video-indicator');
+                        if (existingVideoIcon) existingVideoIcon.remove();
+
+                        if (isVideo) {
+                            // 動画の場合: サムネイルを生成してプレビュー表示
+                            try {
+                                const thumbBlob = await generateVideoThumbnail(file);
+                                const thumbURL = URL.createObjectURL(thumbBlob);
+                                const img = document.createElement('img');
+                                img.className = 'preview';
+                                img.src = thumbURL;
+                                box.insertBefore(img, label);
+
+                                // 動画アイコンを表示
+                                const videoIcon = document.createElement('div');
+                                videoIcon.className = 'video-indicator';
+                                videoIcon.textContent = '▶';
+                                box.appendChild(videoIcon);
+                            } catch (err) {
+                                console.error('サムネイル生成エラー:', err);
+                            }
+                        } else {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                const img = document.createElement('img');
+                                img.className = 'preview';
+                                img.src = e.target.result;
+                                box.insertBefore(img, label);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+
+                        // 削除ボタン
+                        if (!box.querySelector('.remove-btn')) {
+                            const removeBtn = document.createElement('button');
+                            removeBtn.className = 'remove-btn';
+                            removeBtn.textContent = '×';
+                            removeBtn.onclick = (ev) => {
+                                ev.preventDefault();
+                                const preview = box.querySelector('img.preview');
+                                if (preview) preview.remove();
+                                const vi = box.querySelector('.video-indicator');
+                                if (vi) vi.remove();
+                                removeBtn.remove();
+                                input.value = '';
+                                selectedPhotos = selectedPhotos.filter((_, idx) => idx !== i - 1);
+
+                                // 次の入力を無効化
+                                if (i < 5) {
+                                    document.getElementById(`photo${i + 1}`).disabled = true;
+                                }
+
+                                updateSubmitButton();
+                            };
+                            box.appendChild(removeBtn);
+                        }
+
+                        selectedPhotos[i - 1] = file;
+
+                        // 次の入力を有効化
+                        if (i < 5 && selectedPhotos.filter(p => p).length < 5) {
+                            document.getElementById(`photo${i + 1}`).disabled = false;
+                        }
+
+                        updateSubmitButton();
+                    });
+                }
+
+                // コメント入力監視
+                document.getElementById('recordComment').addEventListener('input', updateSubmitButton);
+
+                // 投稿処理
+                document.getElementById('submitRecord').addEventListener('click', async () => {
+                    const submitBtn = document.getElementById('submitRecord');
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = '投稿中...';
+
+                    try {
+                        const comment = document.getElementById('recordComment').value.trim();
+                        const recordDate = document.getElementById('recordDate').value;
+                        const height = document.getElementById('recordHeight').value;
+                        const weight = document.getElementById('recordWeight').value;
+
+                        // 写真/動画をアップロード
+                        const photoUploadPromises = selectedPhotos.filter(p => p).map(async (file, index) => {
+                            const timestamp = Date.now();
+                            const randomStr = Math.random().toString(36).substring(7);
+                            const ext = file.name.split('.').pop();
+                            const fileName = `${timestamp}_${randomStr}.${ext}`;
+
+                            if (isVideoFile(file)) {
+                                // 動画: そのままアップロード（Cloud Functionsで変換）
+                                const storageRef = storage.ref(`records/${currentChildId}/${fileName}`);
+                                const uploadTask = storageRef.put(file);
+
+                                // プログレス表示
+                                uploadTask.on('state_changed', (snapshot) => {
+                                    const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                                    submitBtn.textContent = `動画アップ中... ${pct}%`;
+                                });
+
+                                await uploadTask;
+                                const downloadURL = await storageRef.getDownloadURL();
+
+                                // サムネイル生成・アップロード
+                                let thumbnailURL = '';
+                                try {
+                                    const thumbBlob = await generateVideoThumbnail(file);
+                                    const thumbRef = storage.ref(`records/${currentChildId}/${timestamp}_${randomStr}_thumb.jpg`);
+                                    await thumbRef.put(thumbBlob);
+                                    thumbnailURL = await thumbRef.getDownloadURL();
+                                } catch (err) {
+                                    console.error('サムネイルアップロードエラー:', err);
+                                }
+
+                                return {
+                                    photoURL: downloadURL,
+                                    thumbnailURL: thumbnailURL,
+                                    type: 'video',
+                                    displayOrder: index,
+                                    uploadedAt: new Date().toISOString()
+                                };
+                            } else {
+                                // 画像: リサイズしてアップロード
+                                const resizedBlob = await resizeImage(file, 1200, 1200, 0.85);
+                                const storageRef = storage.ref(`records/${currentChildId}/${fileName}`);
+                                await storageRef.put(resizedBlob);
+                                const downloadURL = await storageRef.getDownloadURL();
+
+                                return {
+                                    photoURL: downloadURL,
+                                    type: 'image',
+                                    displayOrder: index,
+                                    uploadedAt: new Date().toISOString()
+                                };
+                            }
+                        });
+
+                        const photos = await Promise.all(photoUploadPromises);
+
+                        // Firestoreに保存
+                        await db.collection('records').add({
+                            childId: currentChildId,
+                            userId: currentUser.uid,
+                            recordDate: firebase.firestore.Timestamp.fromDate(new Date(recordDate)),
+                            comment: comment,
+                            heightCm: height ? parseFloat(height) : null,
+                            weightKg: weight ? parseFloat(weight) : null,
+                            category: selectedCategory,
+                            photos: photos,
+                            viewCount: 0,
+                            viewedBy: [],
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            isDeleted: false
+                        });
+
+                        showToast('✓ 記録を投稿しました', 'success');
+
+                        // モーダルを閉じる
+                        closeRecordModal();
+
+                        // タイムラインを再読み込み
+                        loadTimeline(currentChildId);
+                    } catch (error) {
+                        console.error('Post error:', error);
+                        showToast('投稿に失敗しました: ' + error.message, 'error');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '投稿';
+                    }
+                });
+
+                modal.setAttribute('data-listeners-initialized', 'true');
+            }
+
+            // 初回表示時のボタン状態更新
+            updateSubmitButton();
+        });
+
+        // ========== 詳細モーダル ========== //
+
+        let currentRecordId = null;
+        let currentRecordData = null;
+        let currentPhotoIndex = 0;
+
+        // タイムラインのカードをクリックで詳細表示
+        document.addEventListener('click', (e) => {
+            const card = e.target.closest('.record-card');
+            if (card && !e.target.closest('.btn-menu')) {
+                const recordId = card.dataset.recordId;
+                console.log('Card clicked, dataset:', card.dataset, 'recordId:', recordId);
+                showRecordDetail(recordId);
+            }
+        });
+
+        // 記録詳細を表示
+        async function showRecordDetail(recordId) {
+            console.log('showRecordDetail called with recordId:', recordId);
+            try {
+                const doc = await db.collection('records').doc(recordId).get();
+
+                if (!doc.exists) {
+                    showToast('記録が見つかりません', 'error');
+                    return;
+                }
+
+                currentRecordId = recordId;
+                currentRecordData = { id: doc.id, ...doc.data() };
+                currentPhotoIndex = 0;
+
+                // 閲覧数を増やす
+                await db.collection('records').doc(recordId).update({
+                    viewCount: firebase.firestore.FieldValue.increment(1)
+                });
+
+                // 写真ギャラリーを表示
+                const gallery = document.getElementById('photoGallery');
+                const photoNav = document.getElementById('photoNav');
+                gallery.innerHTML = '';
+                photoNav.innerHTML = '';
+
+                if (currentRecordData.photos && currentRecordData.photos.length > 0) {
+                    // 動画がある場合はギャラリーのスタイルを調整
+                    const hasVideo = currentRecordData.photos.some(p => p.type === 'video');
+                    if (hasVideo) {
+                        gallery.classList.add('has-video');
+                    } else {
+                        gallery.classList.remove('has-video');
+                    }
+
+                    currentRecordData.photos.forEach((photo, index) => {
+                        if (photo.type === 'video') {
+                            // 動画: video要素を生成
+                            const video = document.createElement('video');
+                            // convertedURL（Cloud Functions変換済み）を優先、なければ元URL
+                            video.src = photo.convertedURL || photo.photoURL;
+                            video.controls = true;
+                            video.playsInline = true;
+                            video.preload = 'auto';
+                            video.poster = photo.thumbnailURL || '';
+                            video.className = index === 0 ? 'active' : '';
+                            gallery.appendChild(video);
+                        } else {
+                            // 画像
+                            const img = document.createElement('img');
+                            img.src = photo.photoURL;
+                            img.className = index === 0 ? 'active' : '';
+                            gallery.appendChild(img);
+                        }
+
+                        // ドット
+                        if (currentRecordData.photos.length > 1) {
+                            const dot = document.createElement('div');
+                            dot.className = `dot ${index === 0 ? 'active' : ''}`;
+                            dot.onclick = () => showPhoto(index);
+                            photoNav.appendChild(dot);
+                        }
+                    });
+
+                    // スワイプ検知
+                    let touchStartX = 0;
+                    let touchEndX = 0;
+
+                    gallery.addEventListener('touchstart', (e) => {
+                        touchStartX = e.changedTouches[0].screenX;
+                    });
+
+                    gallery.addEventListener('touchend', (e) => {
+                        touchEndX = e.changedTouches[0].screenX;
+                        handleSwipe();
+                    });
+
+                    function handleSwipe() {
+                        const diff = touchStartX - touchEndX;
+                        if (Math.abs(diff) > 50) {
+                            if (diff > 0) {
+                                // 左スワイプ: 次の写真
+                                showPhoto(currentPhotoIndex + 1);
+                            } else {
+                                // 右スワイプ: 前の写真
+                                showPhoto(currentPhotoIndex - 1);
+                            }
+                        }
+                    }
+                }
+
+                // コメント
+                document.getElementById('detailComment').textContent = currentRecordData.comment;
+
+                // 日時
+                const date = currentRecordData.recordDate.toDate();
+                const dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                document.getElementById('detailDate').textContent = dateStr;
+
+                // カテゴリ
+                const categories = {
+                    daily: '🏠 日常',
+                    meal: '🍴 食事',
+                    play: '🎨 遊び',
+                    outing: '🚗 おでかけ',
+                    growth: '🌱 成長'
+                };
+                document.getElementById('detailCategory').textContent = categories[currentRecordData.category] || '🏠 日常';
+
+                // 身長・体重
+                if (currentRecordData.heightCm || currentRecordData.weightKg) {
+                    const measurements = [];
+                    if (currentRecordData.heightCm) measurements.push(`${currentRecordData.heightCm}cm`);
+                    if (currentRecordData.weightKg) measurements.push(`${currentRecordData.weightKg}kg`);
+                    document.getElementById('detailMeasurementsValue').textContent = measurements.join(' / ');
+                    document.getElementById('detailMeasurements').classList.remove('hidden');
+                } else {
+                    document.getElementById('detailMeasurements').classList.add('hidden');
+                }
+
+                // 閲覧数
+                document.getElementById('detailViewCount').textContent = `${(currentRecordData.viewCount || 0) + 1}回`;
+
+                // 投稿者
+                document.getElementById('detailAuthor').textContent = currentUser.displayName || 'ユーザー';
+
+                // モーダルを表示
+                const modal = document.getElementById('detailModal');
+                const overlay = document.getElementById('detailModalOverlay');
+                overlay.classList.add('show');
+                setTimeout(() => modal.classList.add('show'), 100);
+
+                // イベントリスナー設定（重複防止）
+                if (!modal.hasAttribute('data-listeners-initialized')) {
+                    // 詳細モーダル閉じる
+                    document.getElementById('closeDetailModal').addEventListener('click', closeDetailModal);
+                    document.getElementById('detailModalOverlay').addEventListener('click', closeDetailModal);
+
+                    // 編集ボタン
+                    document.getElementById('editRecordBtn').addEventListener('click', () => {
+                        console.log('Edit button clicked, currentRecordData:', currentRecordData);
+                        if (!currentRecordData) return;
+                        const recordDataCopy = { ...currentRecordData };
+                        closeDetailModal();
+                        setTimeout(() => {
+                            openEditModal(recordDataCopy);
+                        }, 350);
+                    });
+
+                    // 削除ボタン
+                    document.getElementById('deleteRecordBtn').addEventListener('click', () => {
+                        const deleteTargetId = currentRecordId;
+                        closeDetailModal();
+                        setTimeout(() => {
+                            const delModal = document.getElementById('deleteConfirmDialog');
+                            const delOverlay = document.getElementById('deleteConfirmOverlay');
+                            delOverlay.classList.add('show');
+                            setTimeout(() => delModal.classList.add('show'), 100);
+
+                            // 削除ダイアログのリスナー設定
+                            if (!delModal.hasAttribute('data-listeners-initialized')) {
+                                document.getElementById('cancelDeleteBtn').addEventListener('click', closeDeleteDialog);
+                                document.getElementById('deleteConfirmOverlay').addEventListener('click', closeDeleteDialog);
+
+                                document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+                                    const confirmBtn = document.getElementById('confirmDeleteBtn');
+                                    confirmBtn.disabled = true;
+                                    confirmBtn.textContent = '削除中...';
+
+                                    try {
+                                        // 論理削除
+                                        await db.collection('records').doc(deleteTargetId).update({
+                                            isDeleted: true,
+                                            deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                        });
+
+                                        showToast('✓ 記録を削除しました', 'success');
+                                        closeDeleteDialog();
+                                        loadTimeline(currentChildId);
+                                    } catch (error) {
+                                        console.error('Delete error:', error);
+                                        showToast('削除に失敗しました: ' + error.message, 'error');
+                                        confirmBtn.disabled = false;
+                                        confirmBtn.textContent = '削除する';
+                                    }
+                                });
+                                delModal.setAttribute('data-listeners-initialized', 'true');
+                            }
+                        }, 350);
+                    });
+
+                    modal.setAttribute('data-listeners-initialized', 'true');
+                }
+            } catch (error) {
+                console.error('Show detail error:', error);
+                showToast('詳細の表示に失敗しました', 'error');
+            }
+        }
+
+        // 写真/動画を切り替え
+        function showPhoto(index) {
+            if (!currentRecordData.photos || currentRecordData.photos.length === 0) return;
+
+            if (index < 0) index = currentRecordData.photos.length - 1;
+            if (index >= currentRecordData.photos.length) index = 0;
+
+            currentPhotoIndex = index;
+
+            // ギャラリー内の全メディア（img + video）を取得
+            const gallery = document.getElementById('photoGallery');
+            const mediaElements = gallery.querySelectorAll('img, video');
+            mediaElements.forEach((el, i) => {
+                el.classList.toggle('active', i === index);
+                // 非アクティブな動画は一時停止
+                if (el.tagName === 'VIDEO' && i !== index) {
+                    el.pause();
+                }
+            });
+
+            // ドットの表示切り替え
+            const dots = document.querySelectorAll('#photoNav .dot');
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+        }
+
+        // 詳細モーダルを閉じる
+        function closeDetailModal() {
+            // 再生中の動画を停止
+            const gallery = document.getElementById('photoGallery');
+            if (gallery) {
+                gallery.querySelectorAll('video').forEach(v => { v.pause(); v.currentTime = 0; });
+            }
+
+            const modal = document.getElementById('detailModal');
+            const overlay = document.getElementById('detailModalOverlay');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.classList.remove('show'), 300);
+            currentRecordId = null;
+            currentRecordData = null;
+        }
+
+
+
+        // ========== 編集モーダル ========== //
+
+
+
+        // 編集モーダルを開く
+        let editTargetRecordId = null;
+
+        function openEditModal(recordData) {
+            // 編集対象のrecordIdを保持
+            editTargetRecordId = recordData.id;
+            // コメント
+            document.getElementById('editComment').value = recordData.comment;
+
+            // 日時
+            const date = recordData.recordDate.toDate();
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            document.getElementById('editDate').value = date.toISOString().slice(0, 16);
+
+            // カテゴリ
+            document.querySelectorAll('#editCategoryGroup .category-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.category === recordData.category);
+            });
+
+            // 身長・体重
+            document.getElementById('editHeight').value = recordData.heightCm || '';
+            document.getElementById('editWeight').value = recordData.weightKg || '';
+
+            // 既存の写真を表示
+            const photoSelector = document.getElementById('editPhotoSelector');
+            photoSelector.innerHTML = '';
+
+            recordData.photos.forEach((photo, index) => {
+                const box = document.createElement('div');
+                box.className = index === 0 ? 'photo-box primary' : 'photo-box';
+
+                const img = document.createElement('img');
+                img.className = 'preview';
+                // 動画の場合はサムネイルを表示
+                img.src = photo.type === 'video' ? (photo.thumbnailURL || photo.photoURL) : photo.photoURL;
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-btn';
+                removeBtn.textContent = '×';
+                removeBtn.onclick = (e) => {
+                    e.preventDefault();
+                    box.remove();
+                };
+
+                box.appendChild(img);
+                // 動画アイコンを表示
+                if (photo.type === 'video') {
+                    const videoIcon = document.createElement('div');
+                    videoIcon.className = 'video-indicator';
+                    videoIcon.textContent = '▶';
+                    box.appendChild(videoIcon);
+                }
+                box.appendChild(removeBtn);
+                photoSelector.appendChild(box);
+            });
+
+            // 新しい写真/動画の入力欄を追加
+            const remainingSlots = 5 - recordData.photos.length;
+            for (let i = 0; i < remainingSlots; i++) {
+                const box = document.createElement('div');
+                box.className = 'photo-box';
+
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*,video/mp4,video/quicktime,video/webm';
+                input.id = `editPhoto${i + 1}`;
+
+                const label = document.createElement('label');
+                label.setAttribute('for', `editPhoto${i + 1}`);
+                label.innerHTML = '<span class="icon">+</span>';
+
+                box.appendChild(input);
+                box.appendChild(label);
+                photoSelector.appendChild(box);
+            }
+
+            // モーダルを表示
+            const modal = document.getElementById('editModal');
+            const overlay = document.getElementById('editModalOverlay');
+            overlay.classList.add('show');
+            setTimeout(() => modal.classList.add('show'), 100);
+
+            // イベントリスナー設定（重複防止）
+            if (!modal.hasAttribute('data-listeners-initialized')) {
+                // 閉じる
+                document.getElementById('closeEditModal').addEventListener('click', closeEditModal);
+                document.getElementById('editModalOverlay').addEventListener('click', closeEditModal);
+
+                // カテゴリ選択
+                document.querySelectorAll('#editCategoryGroup .category-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        document.querySelectorAll('#editCategoryGroup .category-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                    });
+                });
+
+                // 保存ボタン
+                document.getElementById('saveEditBtn').addEventListener('click', async () => {
+                    const saveBtn = document.getElementById('saveEditBtn');
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = '保存中...';
+
+                    try {
+                        const comment = document.getElementById('editComment').value.trim();
+                        const recordDate = document.getElementById('editDate').value;
+                        const height = document.getElementById('editHeight').value;
+                        const weight = document.getElementById('editWeight').value;
+                        const category = document.querySelector('#editCategoryGroup .category-btn.active').dataset.category;
+
+                        // 更新
+                        await db.collection('records').doc(editTargetRecordId).update({
+                            comment: comment,
+                            recordDate: firebase.firestore.Timestamp.fromDate(new Date(recordDate)),
+                            heightCm: height ? parseFloat(height) : null,
+                            weightKg: weight ? parseFloat(weight) : null,
+                            category: category,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        showToast('✓ 記録を更新しました', 'success');
+                        closeEditModal();
+                        loadTimeline(currentChildId);
+                    } catch (error) {
+                        console.error('Update error:', error);
+                        showToast('更新に失敗しました: ' + error.message, 'error');
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = '保存';
+                    }
+                });
+
+                modal.setAttribute('data-listeners-initialized', 'true');
+            }
+        }
+
+        // 編集モーダルを閉じる
+        function closeEditModal() {
+            const modal = document.getElementById('editModal');
+            const overlay = document.getElementById('editModalOverlay');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.classList.remove('show'), 300);
+            // 保存ボタンをリセット
+            const saveBtn = document.getElementById('saveEditBtn');
+            saveBtn.disabled = false;
+            saveBtn.textContent = '保存';
+        }
+
+
+
+
+
+
+
+        // ========== 削除確認ダイアログ ========== //
+
+
+
+        // キャンセル
+
+
+        function closeDeleteDialog() {
+            const modal = document.getElementById('deleteConfirmDialog');
+            const overlay = document.getElementById('deleteConfirmOverlay');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.classList.remove('show'), 300);
+        }
+
+
+
+        // ========== 子供管理 ========== //
+
+        let currentEditChildId = null;
+        let childPhotoFile = null;
+        let editChildPhotoFile = null;
+
+        // ヘッダーの子供セレクター（既にchildSelectorにリスナーが設定済み）
+        // childSelectHeaderは存在しないため削除
+
+        // 子供登録モーダルを開く（新規登録時に使用）
+        function openAddChildModal() {
+            const modal = document.getElementById('addChildModal');
+            const overlay = document.getElementById('addChildModalOverlay');
+
+            // リセット処理
+            childPhotoFile = null;
+            document.getElementById('addChildName').value = '';
+            document.getElementById('addChildBirthDate').value = '';
+            document.getElementById('childPhotoPreview').innerHTML = '<span style="font-size: 40px; color: var(--text-secondary);">📷</span>';
+
+            // 性別ボタンをリセット
+            document.querySelectorAll('#addChildModal .gender-btn').forEach(btn => {
+                btn.classList.remove('active');
+                btn.style.background = 'var(--bg-secondary)';
+                btn.style.color = 'var(--text-primary)';
+            });
+            document.querySelector('#addChildModal .gender-btn[data-gender=""]').classList.add('active');
+            document.querySelector('#addChildModal .gender-btn[data-gender=""]').style.background = 'var(--accent-blue)';
+            document.querySelector('#addChildModal .gender-btn[data-gender=""]').style.color = 'white';
+
+            // モーダル表示
+            overlay.classList.add('show');
+            setTimeout(() => modal.classList.add('show'), 100);
+
+            // イベントリスナー設定（重複防止）
+            if (!modal.hasAttribute('data-listeners-initialized')) {
+                // 1. モーダルを閉じる
+                document.getElementById('closeAddChildModal').addEventListener('click', closeAddChildModal);
+                document.getElementById('addChildModalOverlay').addEventListener('click', closeAddChildModal);
+
+                // 2. 写真選択
+                document.getElementById('childPhotoInput').addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    // バリデーション
+                    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                        showToast('JPEGまたはPNG、WebP形式の画像を選択してください', 'error');
+                        return;
+                    }
+
+                    if (file.size > 5 * 1024 * 1024) {
+                        showToast('ファイルサイズは5MB以下にしてください', 'error');
+                        return;
+                    }
+
+                    childPhotoFile = file;
+
+                    // プレビュー表示
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const preview = document.getElementById('childPhotoPreview');
+                        preview.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                // 3. 性別ボタン
+                document.querySelectorAll('#addChildModal .gender-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        document.querySelectorAll('#addChildModal .gender-btn').forEach(b => {
+                            b.classList.remove('active');
+                            b.style.background = 'var(--bg-secondary)';
+                            b.style.color = 'var(--text-primary)';
+                        });
+                        btn.classList.add('active');
+                        btn.style.background = 'var(--accent-blue)';
+                        btn.style.color = 'white';
+                        updateSaveChildBtn();
+                    });
+                });
+
+                // 4. 入力検証
+                document.getElementById('addChildName').addEventListener('input', updateSaveChildBtn);
+                document.getElementById('addChildBirthDate').addEventListener('change', updateSaveChildBtn);
+
+                // 5. 保存ボタン
+                document.getElementById('saveChildBtn').addEventListener('click', async () => {
+                    const saveBtn = document.getElementById('saveChildBtn');
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = '保存中...';
+
+                    try {
+                        const name = document.getElementById('addChildName').value.trim();
+                        const birthDate = document.getElementById('addChildBirthDate').value;
+                        const gender = document.querySelector('#addChildModal .gender-btn.active').dataset.gender;
+
+                        let photoURL = '';
+
+                        // 写真をアップロード
+                        if (childPhotoFile) {
+                            const resizedBlob = await resizeImage(childPhotoFile, 400, 400, 0.9);
+                            const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`;
+                            const storageRef = storage.ref(`children/${currentUser.uid}/${fileName}`);
+                            await storageRef.put(resizedBlob);
+                            photoURL = await storageRef.getDownloadURL();
+                        }
+
+                        // Firestoreに保存
+                        await db.collection('children').add({
+                            userId: currentUser.uid,
+                            name: name,
+                            birthDate: firebase.firestore.Timestamp.fromDate(new Date(birthDate)),
+                            gender: gender || null,
+                            photoURL: photoURL,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            isDeleted: false
+                        });
+
+                        showToast('✓ 子供を追加しました', 'success');
+                        closeAddChildModal();
+                        loadChildren();
+                    } catch (error) {
+                        console.error('Save child error:', error);
+                        showToast('保存に失敗しました: ' + error.message, 'error');
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = '保存';
+                    }
+                });
+
+                modal.setAttribute('data-listeners-initialized', 'true');
+            }
+
+            // 初期バリデーション（リセット後の状態を反映）
+            updateSaveChildBtn();
+        }
+
+        // 子供登録モーダルを閉じる
+        function closeAddChildModal() {
+            const modal = document.getElementById('addChildModal');
+            const overlay = document.getElementById('addChildModalOverlay');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.classList.remove('show'), 300);
+        }
+
+
+        // 保存ボタンの有効/無効
+        function updateSaveChildBtn() {
+            const name = document.getElementById('addChildName').value.trim();
+            const birthDate = document.getElementById('addChildBirthDate').value;
+            const saveBtn = document.getElementById('saveChildBtn');
+            saveBtn.disabled = !name || !birthDate;
+        }
+
+
+        // 子供編集モーダルを開く
+        async function openEditChildModal(childId) {
+            try {
+                const doc = await db.collection('children').doc(childId).get();
+
+                if (!doc.exists) {
+                    showToast('子供が見つかりません', 'error');
+                    return;
+                }
+
+                currentEditChildId = childId;
+                const childData = doc.data();
+                editChildPhotoFile = null;
+
+                // データを入力
+                document.getElementById('editChildName').value = childData.name;
+                document.getElementById('editChildName').value = childData.name;
+
+                // 生年月日の処理（Timestamp、Date、文字列に対応）
+                let birthDateObj;
+                const bd = childData.birthDate;
+
+                if (bd && typeof bd.toDate === 'function') {
+                    // Firestore Timestamp
+                    birthDateObj = bd.toDate();
+                } else if (bd instanceof Date) {
+                    // Date Object
+                    birthDateObj = bd;
+                } else if (typeof bd === 'string') {
+                    // String (YYYY-MM-DD or ISO)
+                    birthDateObj = new Date(bd);
+                } else {
+                    // Fallback
+                    birthDateObj = new Date();
+                    console.warn('Unknown birthDate format:', bd);
+                }
+
+                // YYYY-MM-DD形式に変換（ローカル時間考慮）
+                const yyyy = birthDateObj.getFullYear();
+                const mm = String(birthDateObj.getMonth() + 1).padStart(2, '0');
+                const dd = String(birthDateObj.getDate()).padStart(2, '0');
+                document.getElementById('editChildBirthDate').value = `${yyyy}-${mm}-${dd}`;
+
+                // 写真を表示（profilePhotoURL と photoURL の両方に対応）
+                const preview = document.getElementById('editChildPhotoPreview');
+                const editPhotoURL = childData.photoURL || childData.profilePhotoURL;
+                if (editPhotoURL) {
+                    preview.innerHTML = `<img src="${editPhotoURL}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                } else {
+                    preview.innerHTML = '<span style="font-size: 40px; color: var(--text-secondary);">📷</span>';
+                }
+
+                // 性別ボタン
+                document.querySelectorAll('#editGenderGroup .gender-btn').forEach(btn => {
+                    const isActive = btn.dataset.gender === (childData.gender || '');
+                    btn.classList.toggle('active', isActive);
+                    btn.style.background = isActive ? 'var(--accent-blue)' : 'var(--bg-secondary)';
+                    btn.style.color = isActive ? 'white' : 'var(--text-primary)';
+                });
+
+                // モーダルを表示
+                const modal = document.getElementById('editChildModal');
+                const overlay = document.getElementById('editChildModalOverlay');
+                overlay.classList.add('show');
+                setTimeout(() => modal.classList.add('show'), 100);
+
+                // ローカル変数（クロージャ用）
+                // ローカル変数（クロージャ用）削除（グローバル変数を使用するため）
+
+                // イベントリスナー設定（重複防止）
+                // ローカル変数（クロージャ用）削除（グローバル変数を使用するため）
+
+                // イベントリスナー設定（要素をCloneして既存リスナーを削除・再登録）
+                // 閉じるボタン
+                const closeBtn = document.getElementById('closeEditChildModal');
+                const newCloseBtn = closeBtn.cloneNode(true);
+                closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+                newCloseBtn.addEventListener('click', closeEditChildModal);
+
+                const overlayEl = document.getElementById('editChildModalOverlay');
+                const newOverlayEl = overlayEl.cloneNode(true);
+                overlayEl.parentNode.replaceChild(newOverlayEl, overlayEl);
+                newOverlayEl.addEventListener('click', closeEditChildModal);
+                // オーバーレイは表示制御でクラス操作されるため、再取得が必要な場合はIDから取得するが、
+                // ここではcloneした newOverlayEl がDOMにあるのでOK。
+                // ただ、modal.classList操作などがあるので、DOM参照の一貫性に注意。
+                // 安全のため、Cloneはボタン類だけに限定し、Overlay等はremoveEventListenerパターン推奨だが、
+                // ここでは「確実に動く」Cloneパターンで統一する。
+                // ただしOverlayはcloseEditChildModal内で参照されるのでID取得で問題ない。
+
+                // 写真変更
+                const photoInput = document.getElementById('editChildPhotoInput');
+                const newPhotoInput = photoInput.cloneNode(true);
+                photoInput.parentNode.replaceChild(newPhotoInput, photoInput);
+
+                newPhotoInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    if (file.size > 5 * 1024 * 1024) {
+                        showToast('ファイルサイズは5MB以下にしてください', 'error');
+                        e.target.value = '';
+                        return;
+                    }
+
+                    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                    if (!allowedTypes.includes(file.type)) {
+                        showToast('画像形式が正しくありません', 'error');
+                        e.target.value = '';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const preview = document.getElementById('editChildPhotoPreview');
+                        preview.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                    };
+                    reader.readAsDataURL(file);
+                    editChildPhotoFile = file;
+                });
+
+                // 性別ボタン
+                const genderContainer = document.getElementById('editGenderGroup');
+                // コンテナ内のボタンにリスナーをつけるため、コンテナごとCloneはしない（style等がリセットされる恐れはないが）。
+                // ここは個別にCloneする。
+                document.querySelectorAll('#editGenderGroup .gender-btn').forEach(btn => {
+                    const newBtn = btn.cloneNode(true);
+                    btn.parentNode.replaceChild(newBtn, btn);
+
+                    newBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        document.querySelectorAll('#editGenderGroup .gender-btn').forEach(b => {
+                            const isActive = b === newBtn;
+                            b.classList.toggle('active', isActive);
+                            b.style.background = isActive ? 'var(--accent-blue)' : 'var(--bg-secondary)';
+                            b.style.color = isActive ? 'white' : 'var(--text-primary)';
+                        });
+                    });
+                });
+
+                // 更新ボタン
+                const updateBtn = document.getElementById('updateChildBtn');
+                const newUpdateBtn = updateBtn.cloneNode(true);
+                updateBtn.parentNode.replaceChild(newUpdateBtn, updateBtn);
+
+                // 初期状態で有効化（または変更検知を入れるべきだが、まずは操作可能にする）
+                newUpdateBtn.disabled = false;
+
+                newUpdateBtn.addEventListener('click', async () => {
+                    newUpdateBtn.disabled = true;
+                    newUpdateBtn.textContent = '保存中...';
+
+                    try {
+                        const name = document.getElementById('editChildName').value.trim();
+                        const birthDate = document.getElementById('editChildBirthDate').value;
+                        const genderBtn = document.querySelector('#editGenderGroup .gender-btn.active');
+                        const gender = genderBtn ? genderBtn.dataset.gender : null;
+
+                        const updateData = {
+                            name: name,
+                            birthDate: firebase.firestore.Timestamp.fromDate(new Date(birthDate)),
+                            gender: gender,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+
+                        if (editChildPhotoFile) {
+                            const resizedBlob = await resizeImage(editChildPhotoFile, 400, 400, 0.9);
+                            const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`;
+                            const storageRef = storage.ref(`children/${currentUser.uid}/${fileName}`);
+                            await storageRef.put(resizedBlob);
+                            updateData.photoURL = await storageRef.getDownloadURL();
+                        }
+
+                        await db.collection('children').doc(currentEditChildId).update(updateData);
+
+                        showToast('✓ 子供の情報を更新しました', 'success');
+                        closeEditChildModal();
+                        loadChildren();
+                    } catch (error) {
+                        console.error('Update child error:', error);
+                        showToast('更新に失敗しました: ' + error.message, 'error');
+                        newUpdateBtn.disabled = false;
+                        newUpdateBtn.textContent = '保存';
+                    }
+                });
+
+                // 家族を招待ボタン
+                const inviteBtn = document.getElementById('inviteFamilyBtn');
+                if (inviteBtn) {
+                    const newInviteBtn = inviteBtn.cloneNode(true);
+                    inviteBtn.parentNode.replaceChild(newInviteBtn, inviteBtn);
+                    
+                    newInviteBtn.addEventListener('click', () => {
+                        closeEditChildModal();
+                        setTimeout(() => {
+                            openInviteFamilyModal(currentEditChildId);
+                        }, 350);
+                    });
+                }
+
+                // 削除ボタン
+                const deleteBtn = document.getElementById('deleteChildBtn');
+                const newDeleteBtn = deleteBtn.cloneNode(true);
+                deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
+
+                newDeleteBtn.addEventListener('click', () => {
+                    closeEditChildModal();
+                    setTimeout(() => {
+                        const delModal = document.getElementById('deleteChildConfirmDialog');
+                        const delOverlay = document.getElementById('deleteChildConfirmOverlay');
+                        delOverlay.classList.add('show');
+                        setTimeout(() => delModal.classList.add('show'), 100);
+
+                        // 削除ダイアログ内のボタンもCloneして再登録
+                        const cancelBtn = document.getElementById('cancelDeleteChildBtn');
+                        const newCancelBtn = cancelBtn.cloneNode(true);
+                        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+                        newCancelBtn.addEventListener('click', closeDeleteChildDialog);
+
+                        const delConfirmOverlay = document.getElementById('deleteChildOverlay'); // ID注意: HTMLではdeleteChildConfirmOverlay? Step 1555参照
+                        // HTMLチェック:
+                        // Line 415: id="deleteChildConfirmOverlay"
+                        // Line 416: id="deleteChildConfirmDialog"
+                        // JS (Step 1902): getElementById('deleteChildOverlay') としてる？
+                        // JS (Step 1901): getElementById('deleteChildConfirmDialog')
+                        // 削除機能のIDも怪しい。ここで修正する。
+
+                        // 正しいIDを使用
+                        const confirmOverlay = document.getElementById('deleteChildConfirmOverlay');
+                        if (confirmOverlay) { // 念のため存在チェック
+                            const newConfirmOverlay = confirmOverlay.cloneNode(true);
+                            confirmOverlay.parentNode.replaceChild(newConfirmOverlay, confirmOverlay);
+                            newConfirmOverlay.addEventListener('click', closeDeleteChildDialog);
+                        }
+
+                        const confirmBtn = document.getElementById('confirmDeleteChildBtn');
+                        const newConfirmBtn = confirmBtn.cloneNode(true);
+                        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+
+                        newConfirmBtn.addEventListener('click', async () => {
+                            newConfirmBtn.disabled = true;
+                            newConfirmBtn.textContent = '削除中...';
+
+                            try {
+                                // 既存のレコードを論理削除
+                                const recordsSnapshot = await db.collection('records')
+                                    .where('childId', '==', currentEditChildId)
+                                    .where('isDeleted', '==', false)
+                                    .get();
+
+                                const batch = db.batch();
+                                recordsSnapshot.forEach(doc => {
+                                    batch.update(doc.ref, {
+                                        isDeleted: true,
+                                        deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                    });
+                                });
+
+                                // 子供も論理削除
+                                batch.update(db.collection('children').doc(currentEditChildId), {
+                                    isDeleted: true,
+                                    deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+
+                                await batch.commit();
+
+                                showToast('✓ 子供を削除しました', 'success');
+                                closeDeleteChildDialog();
+                                location.reload();
+                            } catch (error) {
+                                console.error('Delete child error:', error);
+                                showToast('削除に失敗しました: ' + error.message, 'error');
+                                newConfirmBtn.disabled = false;
+                                newConfirmBtn.textContent = '削除する';
+                            }
+                        });
+                    }, 350);
+                });
+            } catch (error) {
+                console.error('Open edit child modal error:', error);
+                showToast('編集画面の表示に失敗しました: ' + error.message, 'error');
+            }
+        }
+
+        // 子供編集モーダルを閉じる
+        function closeEditChildModal() {
+            const modal = document.getElementById('editChildModal');
+            const overlay = document.getElementById('editChildModalOverlay');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.classList.remove('show'), 300);
+        }
+
+
+
+        // 子供削除確認ダイアログを閉じる
+        function closeDeleteChildDialog() {
+            const modal = document.getElementById('deleteChildConfirmDialog');
+            const overlay = document.getElementById('deleteChildConfirmOverlay');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.classList.remove('show'), 300);
+        }
+
+        // ========== 招待コード機能 ========== //
+
+        /**
+         * ランダムな招待コードを生成
+         */
+        function generateInviteCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 紛らわしい文字を除外
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        /**
+         * 招待コード入力モーダルを開く
+         */
+        function openJoinFamilyModal() {
+            const modal = document.getElementById('joinFamilyModal');
+            const overlay = document.getElementById('joinFamilyModalOverlay');
+            const input = document.getElementById('inviteCodeInput');
+            const submitBtn = document.getElementById('submitInviteCode');
+            
+            // リセット
+            input.value = '';
+            submitBtn.disabled = true;
+            submitBtn.textContent = '参加する';
+            
+            overlay.classList.add('show');
+            setTimeout(() => {
+                modal.classList.add('show');
+                input.focus();
+            }, 100);
+        }
+
+        /**
+         * 招待コード入力モーダルを閉じる
+         */
+        function closeJoinFamilyModal() {
+            const modal = document.getElementById('joinFamilyModal');
+            const overlay = document.getElementById('joinFamilyModalOverlay');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.classList.remove('show'), 300);
+        }
+
+        /**
+         * 家族招待モーダルを開く（コード発行）
+         */
+        async function openInviteFamilyModal(childId) {
+            const modal = document.getElementById('inviteFamilyModal');
+            const overlay = document.getElementById('inviteFamilyModalOverlay');
+            const codeDisplay = document.getElementById('generatedInviteCode');
+            const expiryDisplay = document.getElementById('inviteCodeExpiry');
+            
+            codeDisplay.textContent = '生成中...';
+            
+            overlay.classList.add('show');
+            setTimeout(() => modal.classList.add('show'), 100);
+            
+            try {
+                console.log('[招待] childId:', childId);
+                
+                // 既存の有効な招待コードを検索
+                const existingInvites = await db.collection('familyInvites')
+                    .where('childId', '==', childId)
+                    .where('isUsed', '==', false)
+                    .get();
+                
+                console.log('[招待] 既存コード件数:', existingInvites.docs.length);
+                
+                let inviteCode;
+                let expiresAt;
+                const now = new Date();
+                
+                // 有効期限内のコードを探す
+                const validInvite = existingInvites.docs.find(doc => {
+                    const data = doc.data();
+                    const hasExpiry = data.expiresAt && typeof data.expiresAt.toDate === 'function';
+                    const isValid = hasExpiry && data.expiresAt.toDate() > now;
+                    console.log('[招待] コード:', data.code, '有効期限あり:', hasExpiry, '有効:', isValid);
+                    return isValid;
+                });
+                
+                if (validInvite) {
+                    // 既存の有効なコードを再利用
+                    const existingData = validInvite.data();
+                    inviteCode = existingData.code;
+                    expiresAt = existingData.expiresAt.toDate();
+                    console.log('[招待] 既存コード再利用:', inviteCode);
+                } else {
+                    // 新しいコードを生成
+                    inviteCode = generateInviteCode();
+                    expiresAt = new Date();
+                    expiresAt.setDate(expiresAt.getDate() + 7);
+                    
+                    // Firestoreに保存
+                    const docRef = await db.collection('familyInvites').add({
+                        code: inviteCode,
+                        childId: childId,
+                        createdBy: currentUser.uid,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt),
+                        isUsed: false,
+                        usedBy: null,
+                        usedAt: null
+                    });
+                    console.log('[招待] 新コード保存成功! docId:', docRef.id, 'code:', inviteCode);
+                }
+                
+                codeDisplay.textContent = inviteCode;
+                
+                // 残り日数を計算
+                const diffTime = expiresAt - now;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                expiryDisplay.textContent = `${diffDays}日間`;
+                
+                // コピーとLINE共有のためにコードを保存
+                modal.dataset.inviteCode = inviteCode;
+                modal.dataset.childId = childId;
+                
+            } catch (error) {
+                console.error('[招待] エラー:', error);
+                codeDisplay.textContent = 'エラー';
+                showToast('招待コードの生成に失敗しました: ' + error.message, 'error');
+            }
+        }
+
+        /**
+         * 家族招待モーダルを閉じる
+         */
+        function closeInviteFamilyModal() {
+            const modal = document.getElementById('inviteFamilyModal');
+            const overlay = document.getElementById('inviteFamilyModalOverlay');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.classList.remove('show'), 300);
+        }
+
+        /**
+         * 招待コードをクリップボードにコピー
+         */
+        async function copyInviteCode() {
+            const modal = document.getElementById('inviteFamilyModal');
+            const code = modal.dataset.inviteCode;
+            
+            if (!code) return;
+            
+            try {
+                await navigator.clipboard.writeText(code);
+                showToast('✓ コードをコピーしました', 'success');
+            } catch (error) {
+                // フォールバック
+                const textArea = document.createElement('textarea');
+                textArea.value = code;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('✓ コードをコピーしました', 'success');
+            }
+        }
+
+        /**
+         * LINEで招待コードを共有
+         */
+        function shareInviteCodeLine() {
+            const modal = document.getElementById('inviteFamilyModal');
+            const code = modal.dataset.inviteCode;
+            
+            if (!code) {
+                showToast('コードが見つかりません', 'error');
+                return;
+            }
+            
+            const appUrl = window.location.origin + window.location.pathname;
+            const message = `📸 Memories - 子供の成長記録アプリ
+
+招待コード: ${code}
+
+以下のURLにアクセスして、Googleログイン後に「招待コードを入力」からコードを入力してね！
+${appUrl}`;
+            
+            // LINE共有URL（social-pluginsを使用）
+            const lineUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(message)}`;
+            
+            // 新しいウィンドウで開く
+            const newWindow = window.open(lineUrl, '_blank', 'width=600,height=500');
+            
+            // ポップアップがブロックされた場合
+            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+                // 直接遷移を試みる
+                window.location.href = lineUrl;
+            }
+        }
+
+        /**
+         * 招待コードで参加する
+         */
+        async function joinWithInviteCode() {
+            const input = document.getElementById('inviteCodeInput');
+            const submitBtn = document.getElementById('submitInviteCode');
+            const code = input.value.trim().toUpperCase();
+            
+            if (!code || code.length < 6) {
+                showToast('招待コードを入力してください', 'error');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = '確認中...';
+            
+            try {
+                // 招待コードを検索
+                const inviteSnapshot = await db.collection('familyInvites')
+                    .where('code', '==', code)
+                    .get();
+                
+                // クライアント側で未使用のコードをフィルタリング
+                const validInvite = inviteSnapshot.docs.find(doc => !doc.data().isUsed);
+                
+                if (!validInvite) {
+                    showToast('無効な招待コードです', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '参加する';
+                    return;
+                }
+                
+                const inviteData = validInvite.data();
+                
+                // 有効期限チェック
+                if (inviteData.expiresAt && inviteData.expiresAt.toDate() < new Date()) {
+                    showToast('この招待コードは期限切れです', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '参加する';
+                    return;
+                }
+                
+                // 自分の子供に参加しようとしていないかチェック
+                const childDoc = await db.collection('children').doc(inviteData.childId).get();
+                if (childDoc.exists && childDoc.data().userId === currentUser.uid) {
+                    showToast('自分の子供には参加できません', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '参加する';
+                    return;
+                }
+                
+                // 既に参加済みかチェック
+                const existingShare = await db.collection('familyShares')
+                    .where('childId', '==', inviteData.childId)
+                    .where('sharedUserId', '==', currentUser.uid)
+                    .get();
+                
+                // クライアント側でアクティブなものをフィルタリング
+                const activeShare = existingShare.docs.find(doc => doc.data().isActive);
+                
+                if (activeShare) {
+                    showToast('既に参加済みです', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '参加する';
+                    return;
+                }
+                
+                // 共有レコードを作成
+                await db.collection('familyShares').add({
+                    childId: inviteData.childId,
+                    ownerId: inviteData.createdBy,
+                    sharedUserId: currentUser.uid,
+                    sharedUserEmail: currentUser.email,
+                    sharedUserName: currentUser.displayName,
+                    permission: 'view',
+                    inviteCode: code,
+                    isActive: true,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showToast('✓ タイムラインに参加しました！', 'success');
+                closeJoinFamilyModal();
+                
+                // 子供一覧を再読み込み
+                loadChildren(currentUser.uid);
+                
+            } catch (error) {
+                console.error('Join with invite code error:', error);
+                showToast('参加に失敗しました: ' + error.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = '参加する';
+            }
+        }
+
+        // ========== 招待コード関連イベントリスナー ========== //
+
+        // 招待コードを入力ボタン
+        document.getElementById('joinFamilyButton')?.addEventListener('click', openJoinFamilyModal);
+
+        // 招待コード入力モーダルの閉じるボタン
+        document.getElementById('closeJoinFamilyModal')?.addEventListener('click', closeJoinFamilyModal);
+        document.getElementById('joinFamilyModalOverlay')?.addEventListener('click', closeJoinFamilyModal);
+
+        // 招待コード入力欄の変更
+        document.getElementById('inviteCodeInput')?.addEventListener('input', (e) => {
+            const value = e.target.value.trim();
+            const submitBtn = document.getElementById('submitInviteCode');
+            submitBtn.disabled = value.length < 6;
+        });
+
+        // 参加ボタン
+        document.getElementById('submitInviteCode')?.addEventListener('click', joinWithInviteCode);
+
+        // Enterキーで参加
+        document.getElementById('inviteCodeInput')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const submitBtn = document.getElementById('submitInviteCode');
+                if (!submitBtn.disabled) {
+                    joinWithInviteCode();
+                }
+            }
+        });
+
+        // 家族招待モーダルの閉じるボタン
+        document.getElementById('closeInviteFamilyModal')?.addEventListener('click', closeInviteFamilyModal);
+        document.getElementById('inviteFamilyModalOverlay')?.addEventListener('click', closeInviteFamilyModal);
+
+        // コードをコピーボタン
+        document.getElementById('copyInviteCode')?.addEventListener('click', copyInviteCode);
+
+        // LINEで共有ボタン
+        document.getElementById('shareInviteCodeLine')?.addEventListener('click', shareInviteCodeLine);
+
+
+
+    </script>
+</body>
+
+</html>
