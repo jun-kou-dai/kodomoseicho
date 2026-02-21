@@ -1,8 +1,9 @@
-const functions = require("firebase-functions/v1");
+const { onObjectFinalized } = require("firebase-functions/v2/storage");
 const admin = require("firebase-admin");
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
+const crypto = require("crypto");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegStatic = require("ffmpeg-static");
 
@@ -11,162 +12,126 @@ admin.initializeApp();
 const storage = admin.storage();
 const db = admin.firestore();
 
-// ffmpegのパスを設定
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
 /**
- * Firebase Storageに動画がアップロードされたら自動的に
- * MP4コンテナに再パッケージ（映像・音声はコピー、画質劣化なし）
- * faststartフラグを付与してストリーミング再生に最適化
+ * 動画アップロード時に自動でVFR→CFR変換
+ *
+ * スマホ動画はVFR（可変フレームレート）で保存されるため、
+ * HTML5 videoタグで再生すると音ズレが起きる。
+ * H.264/CFR(30fps)/AAC/faststartに変換して解消する。
  */
-exports.convertVideo = functions
-  .runWith({
-    timeoutSeconds: 540,
-    memory: "2GB",
-  })
-  .storage.object()
-  .onFinalize(async (object) => {
-    const filePath = object.name;
-    const contentType = object.contentType;
-    const bucket = storage.bucket(object.bucket);
+exports.convertVideo = onObjectFinalized({
+  timeoutSeconds: 540,
+  memory: "2GiB",
+}, async (event) => {
+  const filePath = event.data.name;
+  const contentType = event.data.contentType;
+  const bucket = storage.bucket(event.data.bucket);
 
-    // 動画ファイル以外はスキップ
-    if (!contentType || !contentType.startsWith("video/")) {
-      console.log("動画ではないのでスキップ:", filePath);
-      return null;
-    }
+  if (!contentType || !contentType.startsWith("video/")) return;
+  if (filePath.includes("_web.mp4")) return;
+  if (filePath.includes("_thumb.")) return;
 
-    // 変換済みファイル(_web.mp4)はスキップ（無限ループ防止）
-    if (filePath.includes("_web.mp4")) {
-      console.log("変換済みファイルなのでスキップ:", filePath);
-      return null;
-    }
+  console.log("=== 動画の変換開始 ===", filePath);
 
-    // サムネイル(_thumb.jpg)はスキップ
-    if (filePath.includes("_thumb.")) {
-      console.log("サムネイルなのでスキップ:", filePath);
-      return null;
-    }
+  const fileName = path.basename(filePath);
+  const fileNameNoExt = path.parse(fileName).name;
+  const uid = Date.now();
+  const tempInput = path.join(os.tmpdir(), `in_${uid}_${fileName}`);
+  const tempOutput = path.join(os.tmpdir(), `out_${uid}_${fileNameNoExt}_web.mp4`);
 
-    console.log("動画変換を開始:", filePath);
+  const dirPath = path.dirname(filePath);
+  const convertedPath = `${dirPath}/${fileNameNoExt}_web.mp4`;
 
-    // パスからchildIdを抽出（records/{childId}/xxx.mp4）
+  try {
+    console.log("ダウンロード中:", filePath);
+    await bucket.file(filePath).download({ destination: tempInput });
+
+    console.log("VFR→CFR変換中...");
+    await new Promise((resolve, reject) => {
+      ffmpeg(tempInput)
+        .videoCodec("libx264")
+        .outputOptions([
+          "-crf 18",
+          "-preset medium",
+          "-r 30",
+          "-profile:v high",
+          "-pix_fmt yuv420p",
+          "-movflags +faststart",
+        ])
+        .audioCodec("aac")
+        .audioBitrate("192k")
+        .on("start", (cmd) => console.log("ffmpeg:", cmd))
+        .on("progress", (p) => {
+          if (p.percent) console.log(`進捗: ${Math.round(p.percent)}%`);
+        })
+        .on("end", () => {
+          console.log("変換完了");
+          resolve();
+        })
+        .on("error", (err) => {
+          console.error("変換エラー:", err);
+          reject(err);
+        })
+        .save(tempOutput);
+    });
+
+    const downloadToken = crypto.randomUUID();
+
+    console.log("アップロード中:", convertedPath);
+    await bucket.upload(tempOutput, {
+      destination: convertedPath,
+      metadata: {
+        contentType: "video/mp4",
+        metadata: {
+          originalPath: filePath,
+          firebaseStorageDownloadTokens: downloadToken,
+        },
+      },
+    });
+
+    const bucketName = bucket.name;
+    const encodedPath = encodeURIComponent(convertedPath);
+    const convertedURL = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${downloadToken}`;
+
+    console.log("変換済みURL:", convertedURL);
+
+    // Firestoreのレコードを更新
     const pathParts = filePath.split("/");
     const childId = pathParts.length >= 3 ? pathParts[1] : null;
+    const encodedOrigPath = encodeURIComponent(filePath);
 
-    // 一時ファイルパス
-    const fileName = path.basename(filePath);
-    const fileNameNoExt = path.parse(fileName).name;
-    const tempInput = path.join(os.tmpdir(), fileName);
-    const tempOutput = path.join(os.tmpdir(), `${fileNameNoExt}_web.mp4`);
-
-    // 変換後のStorageパス
-    const dirPath = path.dirname(filePath);
-    const convertedPath = `${dirPath}/${fileNameNoExt}_web.mp4`;
-
-    try {
-      // 1. 元動画をダウンロード
-      console.log("ダウンロード中...");
-      await bucket.file(filePath).download({ destination: tempInput });
-
-      // 2. ffmpegでMP4に再パッケージ（映像・音声はそのままコピー、画質劣化なし）
-      console.log("MP4再パッケージ中（画質劣化なし）...");
-      await new Promise((resolve, reject) => {
-        ffmpeg(tempInput)
-          .outputOptions([
-            "-c:v copy",
-            "-c:a copy",
-            "-movflags +faststart",
-          ])
-          .on("start", (cmd) => console.log("ffmpeg開始:", cmd))
-          .on("progress", (p) => {
-            if (p.percent) console.log(`進捗: ${Math.round(p.percent)}%`);
-          })
-          .on("end", () => {
-            console.log("再パッケージ完了");
-            resolve();
-          })
-          .on("error", (err) => {
-            console.error("再パッケージエラー:", err);
-            reject(err);
-          })
-          .save(tempOutput);
-      });
-
-      // 3. 変換後ファイルをアップロード
-      console.log("アップロード中:", convertedPath);
-      await bucket.upload(tempOutput, {
-        destination: convertedPath,
-        metadata: {
-          contentType: "video/mp4",
-          metadata: {
-            originalPath: filePath,
-          },
-        },
-      });
-
-      // 4. 変換後ファイルの公開URLを取得
-      const convertedFile = bucket.file(convertedPath);
-      await convertedFile.makePublic();
-      const convertedURL = `https://storage.googleapis.com/${object.bucket}/${convertedPath}`;
-
-      // 5. Firestoreで該当レコードを検索し、convertedURLを追加
-      console.log("Firestore更新中...");
-      const encodedPath = encodeURIComponent(filePath);
-
-      // インデックス不要なクエリ（childIdのみで絞り込み）
-      let recordsSnapshot;
-      if (childId) {
-        recordsSnapshot = await db.collection("records")
-          .where("childId", "==", childId)
-          .limit(100)
-          .get();
-      } else {
-        recordsSnapshot = await db.collection("records")
-          .limit(200)
-          .get();
-      }
-
-      let updated = false;
-
-      for (const doc of recordsSnapshot.docs) {
-        const data = doc.data();
-        if (!data.photos || !Array.isArray(data.photos)) continue;
-
-        const photoIndex = data.photos.findIndex(
-          (p) => p.type === "video" && p.photoURL && p.photoURL.includes(encodedPath)
-        );
-
-        if (photoIndex !== -1) {
-          const photos = [...data.photos];
-          photos[photoIndex] = {
-            ...photos[photoIndex],
-            convertedURL: convertedURL,
-          };
-
-          await doc.ref.update({ photos });
-          console.log(`レコード ${doc.id} を更新しました（photo index: ${photoIndex}）`);
-          updated = true;
-          break;
-        }
-      }
-
-      if (!updated) {
-        console.log("該当するFirestoreレコードが見つかりませんでした。");
-        console.log("convertedURL:", convertedURL);
-      }
-
-      // 6. 一時ファイル削除
-      fs.unlinkSync(tempInput);
-      fs.unlinkSync(tempOutput);
-
-      console.log("動画変換処理が完了しました:", convertedPath);
-      return null;
-
-    } catch (error) {
-      console.error("動画変換処理でエラー:", error);
-      try { fs.unlinkSync(tempInput); } catch (e) { /* ignore */ }
-      try { fs.unlinkSync(tempOutput); } catch (e) { /* ignore */ }
-      throw error;
+    let recordsSnapshot;
+    if (childId) {
+      recordsSnapshot = await db.collection("records")
+        .where("childId", "==", childId)
+        .limit(100)
+        .get();
+    } else {
+      recordsSnapshot = await db.collection("records")
+        .limit(200)
+        .get();
     }
-  });
+
+    for (const doc of recordsSnapshot.docs) {
+      const data = doc.data();
+      if (!data.photos || !Array.isArray(data.photos)) continue;
+
+      const photoIndex = data.photos.findIndex(
+        (p) => p.type === "video" && p.photoURL && p.photoURL.includes(encodedOrigPath)
+      );
+
+      if (photoIndex !== -1) {
+        const photos = [...data.photos];
+        photos[photoIndex] = { ...photos[photoIndex], convertedURL };
+        await doc.ref.update({ photos });
+        console.log(`レコード ${doc.id} を更新`);
+        break;
+      }
+    }
+  } finally {
+    try { fs.unlinkSync(tempInput); } catch (e) { /* ignore */ }
+    try { fs.unlinkSync(tempOutput); } catch (e) { /* ignore */ }
+  }
+});
