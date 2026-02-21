@@ -2321,6 +2321,8 @@
                 photoNav.innerHTML = '';
 
                 if (currentRecordData.photos && currentRecordData.photos.length > 0) {
+                    gallery.style.display = '';
+                    photoNav.style.display = '';
                     currentRecordData.photos.forEach((photo, index) => {
                         if (photo.type === 'video') {
                             // 動画: <video>タグを使用
@@ -2420,6 +2422,10 @@
                             }
                         });
                     }
+                } else {
+                    // 写真がない場合はギャラリーを非表示
+                    gallery.style.display = 'none';
+                    photoNav.style.display = 'none';
                 }
 
                 // コメント
@@ -2585,11 +2591,16 @@
 
         // 詳細モーダルを閉じる
         function closeDetailModal() {
-            // 動画を停止
-            document.querySelectorAll('#photoGallery video').forEach(v => {
+            // 動画を停止してリソース解放
+            const gallery = document.getElementById('photoGallery');
+            gallery.querySelectorAll('video').forEach(v => {
                 v.pause();
-                v.currentTime = 0;
+                v.removeAttribute('src');
+                v.load(); // srcクリア後にloadでネットワーク接続を解放
             });
+            gallery.innerHTML = '';
+            gallery.classList.remove('portrait-video');
+            document.getElementById('photoNav').innerHTML = '';
             const modal = document.getElementById('detailModal');
             const overlay = document.getElementById('detailModalOverlay');
             modal.classList.remove('show');
