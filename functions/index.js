@@ -53,15 +53,17 @@ exports.convertVideo = onObjectFinalized({
       ffmpeg(tempInput)
         .videoCodec("libx264")
         .outputOptions([
+          "-vsync cfr",
+          "-r 30",
           "-crf 18",
           "-preset medium",
-          "-r 30",
           "-profile:v high",
           "-pix_fmt yuv420p",
           "-movflags +faststart",
         ])
         .audioCodec("aac")
         .audioBitrate("192k")
+        .audioFilters("aresample=async=1")
         .on("start", (cmd) => console.log("ffmpeg:", cmd))
         .on("progress", (p) => {
           if (p.percent) console.log(`進捗: ${Math.round(p.percent)}%`);

@@ -93,19 +93,66 @@
 #photoGallery video {
     display: none;
     width: 100%;
-    max-height: 400px;
+    height: 100%;
     object-fit: contain;
     background: #000;
     border-radius: var(--radius-md);
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
     opacity: 1;
     transition: none;
 }
 
 #photoGallery video.active {
     display: block;
-    position: relative;
+    position: absolute;
     opacity: 1;
+}
+
+/* 動画フルスクリーンボタン */
+.video-fullscreen-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+    padding: 0;
+}
+
+.video-fullscreen-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: white;
+}
+
+/* ボタン表示はJSで管理（data-for-index属性でアクティブ動画のみ表示） */
+
+/* 動画変換中メッセージ（オーバーレイ、コントロールより上に配置） */
+.converting-notice {
+    position: absolute;
+    bottom: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: #FF9800;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--radius-full, 20px);
+    z-index: 10;
+    white-space: nowrap;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
 }
 
 /* タイムラインカードの動画バッジ */
@@ -148,13 +195,7 @@
     pointer-events: none;
 }
 
-/* 動画変換中メッセージ（詳細ビュー） */
-.converting-notice {
-    text-align: center;
-    color: #FF9800;
-    font-size: 13px;
-    padding: 8px 0 4px;
-}
+/* 旧 .converting-notice はオーバーレイ版に統合済み */
 
 /* アルバムグリッドの動画アイコン */
 .album-video-icon {
