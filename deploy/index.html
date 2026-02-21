@@ -2329,7 +2329,7 @@
                             video.src = photo.convertedURL || photo.photoURL;
                             video.controls = true;
                             video.playsInline = true;
-                            video.preload = 'auto';
+                            video.preload = index === 0 ? 'auto' : 'metadata';
                             video.poster = photo.thumbnailURL || '';
                             video.className = index === 0 ? 'active' : '';
                             video.dataset.mediaIndex = index;
@@ -2337,8 +2337,9 @@
                             video.addEventListener('loadedmetadata', function() {
                                 if (this.videoHeight > this.videoWidth) {
                                     this.dataset.portrait = 'true';
-                                    // アクティブな動画なら即座にクラス付与
-                                    if (this.classList.contains('active')) {
+                                    // アクティブかつ現在のギャラリーに属している場合のみクラス付与
+                                    // （レコード切替で別の動画のコールバックが残る場合の対策）
+                                    if (this.classList.contains('active') && gallery.contains(this)) {
                                         gallery.classList.add('portrait-video');
                                     }
                                 }
@@ -2403,30 +2404,21 @@
                         }
                     });
 
-                    // スワイプ検知
-                    let touchStartX = 0;
-                    let touchEndX = 0;
+                    // スワイプ検知（リスナーは1度だけ登録）
+                    if (!gallery.dataset.swipeInit) {
+                        gallery.dataset.swipeInit = 'true';
+                        let touchStartX = 0;
 
-                    gallery.addEventListener('touchstart', (e) => {
-                        touchStartX = e.changedTouches[0].screenX;
-                    });
+                        gallery.addEventListener('touchstart', (e) => {
+                            touchStartX = e.changedTouches[0].screenX;
+                        });
 
-                    gallery.addEventListener('touchend', (e) => {
-                        touchEndX = e.changedTouches[0].screenX;
-                        handleSwipe();
-                    });
-
-                    function handleSwipe() {
-                        const diff = touchStartX - touchEndX;
-                        if (Math.abs(diff) > 50) {
-                            if (diff > 0) {
-                                // 左スワイプ: 次の写真
-                                showPhoto(currentPhotoIndex + 1);
-                            } else {
-                                // 右スワイプ: 前の写真
-                                showPhoto(currentPhotoIndex - 1);
+                        gallery.addEventListener('touchend', (e) => {
+                            const diff = touchStartX - e.changedTouches[0].screenX;
+                            if (Math.abs(diff) > 50) {
+                                showPhoto(currentPhotoIndex + (diff > 0 ? 1 : -1));
                             }
-                        }
+                        });
                     }
                 }
 
@@ -2495,6 +2487,8 @@
                         setTimeout(() => {
                             const delModal = document.getElementById('deleteConfirmDialog');
                             const delOverlay = document.getElementById('deleteConfirmOverlay');
+                            // 削除対象IDをダイアログ要素に保存（staleクロージャ対策）
+                            delModal.dataset.targetId = deleteTargetId;
                             delOverlay.classList.add('show');
                             setTimeout(() => delModal.classList.add('show'), 100);
 
@@ -2504,13 +2498,15 @@
                                 document.getElementById('deleteConfirmOverlay').addEventListener('click', closeDeleteDialog);
 
                                 document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+                                    const targetId = delModal.dataset.targetId;
+                                    if (!targetId) return;
                                     const confirmBtn = document.getElementById('confirmDeleteBtn');
                                     confirmBtn.disabled = true;
                                     confirmBtn.textContent = '削除中...';
 
                                     try {
                                         // 論理削除
-                                        await db.collection('records').doc(deleteTargetId).update({
+                                        await db.collection('records').doc(targetId).update({
                                             isDeleted: true,
                                             deletedAt: firebase.firestore.FieldValue.serverTimestamp()
                                         });
@@ -2540,7 +2536,7 @@
 
         // 写真を切り替え
         function showPhoto(index) {
-            if (!currentRecordData.photos || currentRecordData.photos.length === 0) return;
+            if (!currentRecordData || !currentRecordData.photos || currentRecordData.photos.length === 0) return;
 
             if (index < 0) index = currentRecordData.photos.length - 1;
             if (index >= currentRecordData.photos.length) index = 0;
