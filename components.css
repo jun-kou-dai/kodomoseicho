@@ -594,6 +594,12 @@
     margin-bottom: var(--space-4);
 }
 
+/* 縦動画の場合、コンテナを縦長にする */
+.photo-gallery.portrait-video {
+    aspect-ratio: 3 / 4;
+    background: #000;
+}
+
 .photo-gallery img {
     position: absolute;
     width: 100%;

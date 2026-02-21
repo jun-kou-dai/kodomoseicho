@@ -2317,6 +2317,7 @@
                 const gallery = document.getElementById('photoGallery');
                 const photoNav = document.getElementById('photoNav');
                 gallery.innerHTML = '';
+                gallery.classList.remove('portrait-video');
                 photoNav.innerHTML = '';
 
                 if (currentRecordData.photos && currentRecordData.photos.length > 0) {
@@ -2331,6 +2332,12 @@
                             video.preload = 'auto';
                             video.poster = photo.thumbnailURL || '';
                             video.className = index === 0 ? 'active' : '';
+                            // 縦動画の検出とコンテナ調整
+                            video.addEventListener('loadedmetadata', function() {
+                                if (this.videoHeight > this.videoWidth) {
+                                    gallery.classList.add('portrait-video');
+                                }
+                            });
                             // 変換済みURLが読み込めない場合、元動画にフォールバック
                             if (photo.convertedURL) {
                                 video.onerror = function() {
@@ -2341,6 +2348,26 @@
                                 };
                             }
                             gallery.appendChild(video);
+
+                            // 拡大ボタンを追加
+                            const fullscreenBtn = document.createElement('button');
+                            fullscreenBtn.className = 'video-fullscreen-btn';
+                            fullscreenBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
+                            fullscreenBtn.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                const v = this.previousElementSibling.tagName === 'VIDEO' ? this.previousElementSibling : gallery.querySelector('video.active');
+                                if (v) {
+                                    if (v.requestFullscreen) {
+                                        v.requestFullscreen();
+                                    } else if (v.webkitEnterFullscreen) {
+                                        v.webkitEnterFullscreen();
+                                    } else if (v.webkitRequestFullscreen) {
+                                        v.webkitRequestFullscreen();
+                                    }
+                                }
+                            });
+                            gallery.appendChild(fullscreenBtn);
+
                             // 変換中メッセージ
                             if (!photo.convertedURL) {
                                 const notice = document.createElement('div');
@@ -2510,16 +2537,22 @@
             currentPhotoIndex = index;
 
             // 写真・動画の表示切り替え
+            const gallery = document.getElementById('photoGallery');
             const items = document.querySelectorAll('#photoGallery img, #photoGallery video');
+            let activeIsPortraitVideo = false;
             items.forEach((el, i) => {
                 el.classList.toggle('active', i === index);
                 // 動画の場合、非表示時は一時停止
                 if (el.tagName === 'VIDEO') {
                     if (i !== index) {
                         el.pause();
+                    } else if (el.videoHeight > el.videoWidth) {
+                        activeIsPortraitVideo = true;
                     }
                 }
             });
+            // 縦動画クラスの切り替え
+            gallery.classList.toggle('portrait-video', activeIsPortraitVideo);
 
             // ドットの表示切り替え
             const dots = document.querySelectorAll('#photoNav .dot');
