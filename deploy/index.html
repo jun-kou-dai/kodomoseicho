@@ -2285,6 +2285,15 @@
                             video.preload = 'auto';
                             video.poster = photo.thumbnailURL || '';
                             video.className = index === 0 ? 'active' : '';
+                            // 変換済みURLが読み込めない場合、元動画にフォールバック
+                            if (photo.convertedURL) {
+                                video.onerror = function() {
+                                    console.warn('変換済み動画の読み込みに失敗、元動画にフォールバック:', photo.convertedURL);
+                                    this.onerror = null; // 無限ループ防止
+                                    this.src = photo.photoURL;
+                                    this.load();
+                                };
+                            }
                             gallery.appendChild(video);
                             // 変換中メッセージ
                             if (!photo.convertedURL) {
