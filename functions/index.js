@@ -1,5 +1,5 @@
 const { onObjectFinalized } = require("firebase-functions/v2/storage");
-const { onRequest } = require("firebase-functions/v2/https");
+const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const path = require("path");
 const os = require("os");
@@ -89,7 +89,7 @@ async function convertVideoFile(bucket, filePath) {
 }
 
 /**
- * 動画アップロード時に自動でVFR→CFR変換
+ * 動画アップロード時に自動でVFR→CFR変換 (Gen 2)
  */
 exports.convertVideo = onObjectFinalized({
   timeoutSeconds: 540,
@@ -142,63 +142,60 @@ exports.convertVideo = onObjectFinalized({
 });
 
 /**
- * 既存動画を再変換するHTTP関数
+ * 既存動画の再変換をトリガーするHTTP関数 (Gen 1 = 認証不要)
+ *
+ * ファイルを上書きコピーすることでconvertVideo(Gen 2)を自動トリガーする。
+ * この関数自体はffmpegを使わないため軽量。
  */
-exports.reprocessVideos = onRequest({
-  timeoutSeconds: 540,
-  memory: "2GiB",
-  cors: true,
-  invoker: "public",
-}, async (req, res) => {
-  console.log("=== 既存動画の再変換開始 ===");
+exports.reprocessVideos = functions
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    console.log("=== 既存動画の再変換トリガー開始 ===");
 
-  const bucket = storage.bucket();
-  const results = [];
+    const bucket = storage.bucket();
+    const results = [];
 
-  const snapshot = await db.collection("records").get();
+    const snapshot = await db.collection("records").get();
 
-  for (const doc of snapshot.docs) {
-    const data = doc.data();
-    if (!data.photos || !Array.isArray(data.photos)) continue;
-    if (data.isDeleted) continue;
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      if (!data.photos || !Array.isArray(data.photos)) continue;
+      if (data.isDeleted) continue;
 
-    for (let i = 0; i < data.photos.length; i++) {
-      const photo = data.photos[i];
-      if (photo.type !== "video" || !photo.photoURL) continue;
-
-      try {
-        const match = photo.photoURL.match(/\/o\/([^?]+)/);
-        if (!match) {
-          results.push({ docId: doc.id, status: "skip", reason: "URL解析失敗" });
-          continue;
-        }
-        const originalPath = decodeURIComponent(match[1]);
-
-        const [exists] = await bucket.file(originalPath).exists();
-        if (!exists) {
-          results.push({ docId: doc.id, status: "skip", reason: "元動画なし" });
+      for (const photo of data.photos) {
+        if (photo.type !== "video" || !photo.photoURL) continue;
+        if (photo.convertedURL) {
+          results.push({ docId: doc.id, status: "skip", reason: "変換済み" });
           continue;
         }
 
-        // 古い変換ファイルを削除
-        const ext = path.extname(originalPath);
-        const basePath = originalPath.substring(0, originalPath.length - ext.length);
-        const oldWebPath = basePath + "_web.mp4";
-        try { await bucket.file(oldWebPath).delete(); } catch (e) { /* ok */ }
+        try {
+          const match = photo.photoURL.match(/\/o\/([^?]+)/);
+          if (!match) {
+            results.push({ docId: doc.id, status: "skip", reason: "URL解析失敗" });
+            continue;
+          }
+          const originalPath = decodeURIComponent(match[1]);
 
-        // 再変換
-        const { convertedURL } = await convertVideoFile(bucket, originalPath);
+          const [exists] = await bucket.file(originalPath).exists();
+          if (!exists) {
+            results.push({ docId: doc.id, status: "skip", reason: "元動画なし" });
+            continue;
+          }
 
-        const photos = [...data.photos];
-        photos[i] = { ...photos[i], convertedURL };
-        await doc.ref.update({ photos });
-
-        results.push({ docId: doc.id, status: "ok", convertedURL });
-      } catch (err) {
-        results.push({ docId: doc.id, status: "error", error: err.message });
+          // ファイルを自分自身にコピー（上書き）→ onObjectFinalized発火 → convertVideo実行
+          await bucket.file(originalPath).copy(originalPath);
+          results.push({ docId: doc.id, path: originalPath, status: "triggered" });
+          console.log(`トリガー済み: ${originalPath}`);
+        } catch (err) {
+          results.push({ docId: doc.id, status: "error", error: err.message });
+        }
       }
     }
-  }
 
-  res.json({ message: "再変換完了", results });
-});
+    const triggered = results.filter((r) => r.status === "triggered").length;
+    res.json({
+      message: `${triggered}件の動画の再変換をトリガーしました。変換はバックグラウンドで実行されます。`,
+      results,
+    });
+  });
