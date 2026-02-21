@@ -2,5 +2,13 @@
   "functions": {
     "source": "functions",
     "runtime": "nodejs20"
+  },
+  "hosting": {
+    "public": "deploy",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
   }
 }
