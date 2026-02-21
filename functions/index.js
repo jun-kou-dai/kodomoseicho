@@ -148,6 +148,7 @@ exports.reprocessVideos = onRequest({
   timeoutSeconds: 540,
   memory: "2GiB",
   cors: true,
+  invoker: "public",
 }, async (req, res) => {
   console.log("=== 既存動画の再変換開始 ===");
 
