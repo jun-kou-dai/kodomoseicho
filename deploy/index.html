@@ -247,10 +247,28 @@
                 </div>
             </div>
 
+            <!-- 気分スタンプ -->
+            <div class="input-group">
+                <label class="input-label">きぶん</label>
+                <div class="stamp-panel" id="stampPanel">
+                    <button type="button" class="stamp-btn" data-stamp="😊" data-label="ごきげん">😊<span>ごきげん</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="😂" data-label="大笑い">😂<span>大笑い</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="😴" data-label="すやすや">😴<span>すやすや</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="😢" data-label="ぐずり">😢<span>ぐずり</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="😋" data-label="もぐもぐ">😋<span>もぐもぐ</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="🎉" data-label="できた！">🎉<span>できた！</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="💪" data-label="がんばった">💪<span>がんばった</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="❤️" data-label="かわいい">❤️<span>かわいい</span></button>
+                </div>
+            </div>
+
             <!-- コメント -->
             <div class="input-group">
-                <label class="input-label">コメント *</label>
-                <textarea id="recordComment" class="input-textarea" placeholder="今日の様子を記録..." rows="4"></textarea>
+                <label class="input-label">コメント</label>
+                <div class="quick-phrase-area" id="quickPhraseArea">
+                    <!-- カテゴリに応じてJSで動的に表示 -->
+                </div>
+                <textarea id="recordComment" class="input-textarea" placeholder="今日の様子を記録...（タップで入力もOK）" rows="3"></textarea>
             </div>
 
             <!-- 日時 -->
@@ -357,10 +375,26 @@
                 <!-- 既存写真と新しい写真入力がここに動的に追加されます -->
             </div>
 
+            <!-- 気分スタンプ（編集） -->
+            <div class="input-group">
+                <label class="input-label">きぶん</label>
+                <div class="stamp-panel" id="editStampPanel">
+                    <button type="button" class="stamp-btn" data-stamp="😊" data-label="ごきげん">😊<span>ごきげん</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="😂" data-label="大笑い">😂<span>大笑い</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="😴" data-label="すやすや">😴<span>すやすや</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="😢" data-label="ぐずり">😢<span>ぐずり</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="😋" data-label="もぐもぐ">😋<span>もぐもぐ</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="🎉" data-label="できた！">🎉<span>できた！</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="💪" data-label="がんばった">💪<span>がんばった</span></button>
+                    <button type="button" class="stamp-btn" data-stamp="❤️" data-label="かわいい">❤️<span>かわいい</span></button>
+                </div>
+            </div>
+
             <!-- コメント -->
             <div class="input-group">
-                <label class="input-label">コメント *</label>
-                <textarea id="editComment" class="input-textarea" rows="4"></textarea>
+                <label class="input-label">コメント</label>
+                <div class="quick-phrase-area" id="editQuickPhraseArea"></div>
+                <textarea id="editComment" class="input-textarea" rows="3"></textarea>
             </div>
 
             <!-- 日時 -->
@@ -1494,7 +1528,7 @@
                                 </div>
                             `}
                             <div class="memory-card-info">
-                                <p class="memory-card-comment">${escapeHtmlGlobal(record.comment || '')}</p>
+                                <p class="memory-card-comment">${record.mood ? `<span class="mood-stamp">${record.mood}</span> ` : ''}${escapeHtmlGlobal(record.comment || '')}</p>
                                 <div class="memory-card-meta">
                                     <span class="memory-card-date">${dateStr}</span>
                                     ${ageAtTime ? `<span class="memory-card-age">${ageAtTime}</span>` : ''}
@@ -1614,7 +1648,7 @@
                     item.style.background = cat.color + '12';
                     item.innerHTML = `
                         <span style="font-size:28px;">${cat.icon}</span>
-                        <p class="album-grid-text">${escapeHtmlGlobal(record.comment || '')}</p>
+                        <p class="album-grid-text">${record.mood ? `<span class="mood-stamp">${record.mood}</span> ` : ''}${escapeHtmlGlobal(record.comment || '')}</p>
                     `;
                     item.addEventListener('click', () => showRecordDetail(record.id));
                     grid.appendChild(item);
@@ -1673,7 +1707,7 @@
                         ${isConverting ? `<span class="converting-badge">変換中...</span>` : ''}
                         ${record.photos.length > 1 ? `<span class="photo-count">📷 ${record.photos.length}枚</span>` : ''}
                         <div class="record-photo-overlay">
-                            <p class="record-comment-overlay">${escapeHtml(record.comment)}</p>
+                            <p class="record-comment-overlay">${record.mood ? `<span class="mood-stamp">${record.mood}</span> ` : ''}${escapeHtml(record.comment)}</p>
                             <div class="record-meta-overlay">
                                 <span class="record-date-overlay">${dateStr}</span>
                                 <span class="record-category-pill" style="background:${category.color}22;color:${category.color};border:1px solid ${category.color}44;">${category.icon} ${category.label}</span>
@@ -1693,7 +1727,7 @@
                         <span>${category.icon}</span>
                     </div>
                     <div class="record-text-content">
-                        <p class="record-comment-text">${escapeHtml(record.comment)}</p>
+                        <p class="record-comment-text">${record.mood ? `<span class="mood-stamp">${record.mood}</span> ` : ''}${escapeHtml(record.comment)}</p>
                         <div class="record-meta-text">
                             <span>${dateStr}</span>
                             <span class="record-category-pill" style="background:${category.color}22;color:${category.color};border:1px solid ${category.color}44;">${category.icon} ${category.label}</span>
@@ -1967,6 +2001,25 @@
 
         let selectedPhotos = [];
         let selectedCategory = 'daily';
+        let selectedMood = '';
+
+        // カテゴリ別クイックフレーズ
+        const quickPhrases = {
+            daily: ['ごきげん♪', 'よく寝た', 'お風呂大好き', 'おさんぽ', 'きょうだい仲良し'],
+            meal: ['完食！', 'よく食べた', '残しちゃった', '新しい食べ物に挑戦', '自分で食べた！', 'おいしそうに食べた'],
+            play: ['夢中で遊んだ', 'お絵かき', '公園で遊んだ', 'お友達と遊んだ', '一人遊びできた'],
+            outing: ['おでかけ楽しかった', '電車に乗った', '動物園', '水族館', 'じぃじばぁば'],
+            growth: ['はじめて○○した！', 'できるようになった', '言葉が増えた', '歯が生えた', '寝返りした', 'つかまり立ち']
+        };
+
+        function renderQuickPhrases(category, targetId) {
+            const area = document.getElementById(targetId);
+            if (!area) return;
+            const phrases = quickPhrases[category] || quickPhrases.daily;
+            area.innerHTML = phrases.map(p =>
+                `<button type="button" class="quick-phrase-btn">${p}</button>`
+            ).join('');
+        }
 
         // モーダル開く
         document.getElementById('addRecordButton').addEventListener('click', () => {
@@ -1981,12 +2034,19 @@
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById('recordDate').value = now.toISOString().slice(0, 16);
 
+            // クイックフレーズ初期表示
+            renderQuickPhrases('daily', 'quickPhraseArea');
+
+            // スタンプリセット
+            selectedMood = '';
+            document.querySelectorAll('#stampPanel .stamp-btn').forEach(b => b.classList.remove('active'));
+
             // 関数定義（クロージャとして機能させるためここに定義）
             function updateSubmitButton() {
                 const comment = document.getElementById('recordComment').value.trim();
                 const hasPhotos = selectedPhotos.filter(p => p).length > 0;
                 const submitBtn = document.getElementById('submitRecord');
-                if (submitBtn) submitBtn.disabled = !comment || !hasPhotos;
+                if (submitBtn) submitBtn.disabled = (!comment && !selectedMood) || !hasPhotos;
             }
 
             function closeRecordModal() {
@@ -1996,9 +2056,11 @@
                 // リセット
                 selectedPhotos = [];
                 selectedCategory = 'daily';
+                selectedMood = '';
                 document.getElementById('recordComment').value = '';
                 document.getElementById('recordHeight').value = '';
                 document.getElementById('recordWeight').value = '';
+                document.querySelectorAll('#stampPanel .stamp-btn').forEach(b => b.classList.remove('active'));
 
                 // 写真をクリア
                 for (let i = 1; i <= 5; i++) {
@@ -2031,7 +2093,38 @@
                         document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
                         selectedCategory = btn.dataset.category;
+                        renderQuickPhrases(selectedCategory, 'quickPhraseArea');
                     });
+                });
+
+                // 気分スタンプ選択
+                document.querySelectorAll('#stampPanel .stamp-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        if (btn.classList.contains('active')) {
+                            btn.classList.remove('active');
+                            selectedMood = '';
+                        } else {
+                            document.querySelectorAll('#stampPanel .stamp-btn').forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                            selectedMood = btn.dataset.stamp;
+                        }
+                        updateSubmitButton();
+                    });
+                });
+
+                // クイックフレーズ挿入（イベント委譲）
+                document.getElementById('quickPhraseArea').addEventListener('click', (e) => {
+                    const btn = e.target.closest('.quick-phrase-btn');
+                    if (!btn) return;
+                    const textarea = document.getElementById('recordComment');
+                    const phrase = btn.textContent;
+                    if (textarea.value && !textarea.value.endsWith(' ') && !textarea.value.endsWith('\n')) {
+                        textarea.value += ' ';
+                    }
+                    textarea.value += phrase;
+                    textarea.focus();
+                    updateSubmitButton();
                 });
 
                 // 写真・動画選択
@@ -2244,6 +2337,7 @@
                             userId: currentUser.uid,
                             recordDate: firebase.firestore.Timestamp.fromDate(new Date(recordDate)),
                             comment: comment,
+                            mood: selectedMood || null,
                             heightCm: height ? parseFloat(height) : null,
                             weightKg: weight ? parseFloat(weight) : null,
                             category: selectedCategory,
@@ -2429,8 +2523,9 @@
                     photoNav.style.display = 'none';
                 }
 
-                // コメント
-                document.getElementById('detailComment').textContent = currentRecordData.comment;
+                // コメント（mood + テキスト）
+                const moodPrefix = currentRecordData.mood ? currentRecordData.mood + ' ' : '';
+                document.getElementById('detailComment').textContent = moodPrefix + (currentRecordData.comment || '');
 
                 // 日時
                 const date = currentRecordData.recordDate.toDate();
@@ -2616,11 +2711,22 @@
         // 編集モーダルを開く
         let editTargetRecordId = null;
 
+        let editSelectedMood = '';
+
         function openEditModal(recordData) {
             // 編集対象のrecordIdを保持
             editTargetRecordId = recordData.id;
             // コメント
-            document.getElementById('editComment').value = recordData.comment;
+            document.getElementById('editComment').value = recordData.comment || '';
+
+            // 気分スタンプを復元
+            editSelectedMood = recordData.mood || '';
+            document.querySelectorAll('#editStampPanel .stamp-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.stamp === editSelectedMood);
+            });
+
+            // クイックフレーズ表示
+            renderQuickPhrases(recordData.category || 'daily', 'editQuickPhraseArea');
 
             // 日時
             const date = recordData.recordDate.toDate();
@@ -2709,7 +2815,36 @@
                         e.preventDefault();
                         document.querySelectorAll('#editCategoryGroup .category-btn').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
+                        renderQuickPhrases(btn.dataset.category, 'editQuickPhraseArea');
                     });
+                });
+
+                // 気分スタンプ選択（編集）
+                document.querySelectorAll('#editStampPanel .stamp-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        if (btn.classList.contains('active')) {
+                            btn.classList.remove('active');
+                            editSelectedMood = '';
+                        } else {
+                            document.querySelectorAll('#editStampPanel .stamp-btn').forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                            editSelectedMood = btn.dataset.stamp;
+                        }
+                    });
+                });
+
+                // クイックフレーズ挿入（編集）
+                document.getElementById('editQuickPhraseArea').addEventListener('click', (e) => {
+                    const btn = e.target.closest('.quick-phrase-btn');
+                    if (!btn) return;
+                    const textarea = document.getElementById('editComment');
+                    const phrase = btn.textContent;
+                    if (textarea.value && !textarea.value.endsWith(' ') && !textarea.value.endsWith('\n')) {
+                        textarea.value += ' ';
+                    }
+                    textarea.value += phrase;
+                    textarea.focus();
                 });
 
                 // 保存ボタン
@@ -2728,6 +2863,7 @@
                         // 更新
                         await db.collection('records').doc(editTargetRecordId).update({
                             comment: comment,
+                            mood: editSelectedMood || null,
                             recordDate: firebase.firestore.Timestamp.fromDate(new Date(recordDate)),
                             heightCm: height ? parseFloat(height) : null,
                             weightKg: weight ? parseFloat(weight) : null,
