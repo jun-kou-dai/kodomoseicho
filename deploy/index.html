@@ -360,6 +360,14 @@
         </div>
     </div>
 
+    <!-- 写真拡大ビューア -->
+    <div id="photoZoomViewer" class="photo-zoom-viewer">
+        <button id="closePhotoZoom" class="photo-zoom-close">&times;</button>
+        <div id="photoZoomContainer" class="photo-zoom-container">
+            <img id="photoZoomImage" class="photo-zoom-image" src="" alt="">
+        </div>
+    </div>
+
     <!-- 編集モーダル -->
     <div id="editModalOverlay" class="modal-overlay"></div>
     <div id="editModal" class="modal">
@@ -2489,7 +2497,20 @@
                             const img = document.createElement('img');
                             img.src = photo.photoURL;
                             img.className = index === 0 ? 'active' : '';
+                            img.dataset.mediaIndex = index;
                             gallery.appendChild(img);
+
+                            // 写真拡大ボタンを追加
+                            const zoomBtn = document.createElement('button');
+                            zoomBtn.className = 'photo-zoom-btn';
+                            zoomBtn.dataset.forIndex = index;
+                            if (index === 0) zoomBtn.style.display = 'flex';
+                            zoomBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/><path d="M12 10h-2v2H9v-2H7V9h2V7h1v2h2v1z"/></svg>';
+                            zoomBtn.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                openPhotoZoom(photo.photoURL);
+                            });
+                            gallery.appendChild(zoomBtn);
                         }
 
                         // ドット
@@ -2675,6 +2696,12 @@
                 notice.style.display = (notice.dataset.forIndex == index) ? '' : 'none';
             });
 
+            // 写真拡大ボタンの表示切り替え（アクティブな画像のボタンのみ表示）
+            const activeIsImage = !activeIsVideo;
+            gallery.querySelectorAll('.photo-zoom-btn').forEach(btn => {
+                btn.style.display = (activeIsImage && btn.dataset.forIndex == index) ? 'flex' : 'none';
+            });
+
             // ドットの表示切り替え
             const dots = document.querySelectorAll('#photoNav .dot');
             dots.forEach((dot, i) => {
@@ -2702,6 +2729,195 @@
             currentRecordData = null;
         }
 
+
+        // ========== 写真拡大ビューア ========== //
+
+        function openPhotoZoom(src) {
+            const viewer = document.getElementById('photoZoomViewer');
+            const img = document.getElementById('photoZoomImage');
+            img.src = src;
+            // ズーム状態をリセット
+            zoomState.scale = 1;
+            zoomState.translateX = 0;
+            zoomState.translateY = 0;
+            applyZoomTransform();
+            viewer.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closePhotoZoom() {
+            const viewer = document.getElementById('photoZoomViewer');
+            viewer.classList.remove('show');
+            document.body.style.overflow = '';
+            // ズーム状態をリセット
+            zoomState.scale = 1;
+            zoomState.translateX = 0;
+            zoomState.translateY = 0;
+            zoomState.isPanning = false;
+            zoomState.lastTap = 0;
+            const img = document.getElementById('photoZoomImage');
+            img.style.transform = '';
+            img.src = '';
+        }
+
+        // ズーム状態管理
+        const zoomState = {
+            scale: 1,
+            translateX: 0,
+            translateY: 0,
+            minScale: 1,
+            maxScale: 5,
+            isPanning: false,
+            startX: 0,
+            startY: 0,
+            lastTap: 0
+        };
+
+        function applyZoomTransform() {
+            const img = document.getElementById('photoZoomImage');
+            img.style.transform = `translate(${zoomState.translateX}px, ${zoomState.translateY}px) scale(${zoomState.scale})`;
+        }
+
+        function clampTranslate() {
+            if (zoomState.scale <= 1) {
+                zoomState.translateX = 0;
+                zoomState.translateY = 0;
+                return;
+            }
+            const container = document.getElementById('photoZoomContainer');
+            const img = document.getElementById('photoZoomImage');
+            const cRect = container.getBoundingClientRect();
+            const iw = img.naturalWidth;
+            const ih = img.naturalHeight;
+            // 画像が未読み込みの場合はクランプをスキップ
+            if (!iw || !ih) return;
+            // 表示サイズ（contain基準）
+            const containerRatio = cRect.width / cRect.height;
+            const imageRatio = iw / ih;
+            let displayW, displayH;
+            if (imageRatio > containerRatio) {
+                displayW = cRect.width;
+                displayH = cRect.width / imageRatio;
+            } else {
+                displayH = cRect.height;
+                displayW = cRect.height * imageRatio;
+            }
+            const scaledW = displayW * zoomState.scale;
+            const scaledH = displayH * zoomState.scale;
+            const maxX = Math.max(0, (scaledW - cRect.width) / 2);
+            const maxY = Math.max(0, (scaledH - cRect.height) / 2);
+            zoomState.translateX = Math.max(-maxX, Math.min(maxX, zoomState.translateX));
+            zoomState.translateY = Math.max(-maxY, Math.min(maxY, zoomState.translateY));
+        }
+
+        // イベント設定（script要素がbody末尾にあるためDOM要素は参照可能）
+        (function initPhotoZoom() {
+            const viewer = document.getElementById('photoZoomViewer');
+            const container = document.getElementById('photoZoomContainer');
+            const closeBtn = document.getElementById('closePhotoZoom');
+            let singleTapTimer = null;
+
+            closeBtn.addEventListener('click', closePhotoZoom);
+
+            // ダブルタップでズーム切替 / シングルタップで閉じる
+            container.addEventListener('click', function(e) {
+                const now = Date.now();
+                if (now - zoomState.lastTap < 300) {
+                    // ダブルタップ: シングルタップタイマーをキャンセル
+                    clearTimeout(singleTapTimer);
+                    e.preventDefault();
+                    if (zoomState.scale > 1) {
+                        zoomState.scale = 1;
+                        zoomState.translateX = 0;
+                        zoomState.translateY = 0;
+                    } else {
+                        zoomState.scale = 2.5;
+                        // タップ位置を中心にズーム
+                        const rect = container.getBoundingClientRect();
+                        const tapX = e.clientX - rect.left - rect.width / 2;
+                        const tapY = e.clientY - rect.top - rect.height / 2;
+                        zoomState.translateX = -tapX * 1.5;
+                        zoomState.translateY = -tapY * 1.5;
+                        clampTranslate();
+                    }
+                    applyZoomTransform();
+                    zoomState.lastTap = 0;
+                } else {
+                    zoomState.lastTap = now;
+                    // シングルタップ: 300ms待ってダブルタップでなければ閉じる（ズーム中でないとき）
+                    if (zoomState.scale <= 1) {
+                        singleTapTimer = setTimeout(function() {
+                            if (zoomState.scale <= 1 && viewer.classList.contains('show')) {
+                                closePhotoZoom();
+                            }
+                        }, 300);
+                    }
+                }
+            });
+
+            // ピンチズーム
+            let pinchStartDist = 0;
+            let pinchStartScale = 1;
+
+            container.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    pinchStartDist = Math.sqrt(dx * dx + dy * dy);
+                    pinchStartScale = zoomState.scale;
+                } else if (e.touches.length === 1 && zoomState.scale > 1) {
+                    zoomState.isPanning = true;
+                    zoomState.startX = e.touches[0].clientX - zoomState.translateX;
+                    zoomState.startY = e.touches[0].clientY - zoomState.translateY;
+                }
+            }, { passive: false });
+
+            container.addEventListener('touchmove', function(e) {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const newScale = pinchStartScale * (dist / pinchStartDist);
+                    zoomState.scale = Math.max(zoomState.minScale, Math.min(zoomState.maxScale, newScale));
+                    clampTranslate();
+                    applyZoomTransform();
+                } else if (e.touches.length === 1 && zoomState.isPanning) {
+                    e.preventDefault();
+                    zoomState.translateX = e.touches[0].clientX - zoomState.startX;
+                    zoomState.translateY = e.touches[0].clientY - zoomState.startY;
+                    clampTranslate();
+                    applyZoomTransform();
+                }
+            }, { passive: false });
+
+            container.addEventListener('touchend', function(e) {
+                if (e.touches.length < 2) {
+                    pinchStartDist = 0;
+                }
+                if (e.touches.length === 0) {
+                    zoomState.isPanning = false;
+                    // スケールが1以下ならリセット
+                    if (zoomState.scale <= 1) {
+                        zoomState.scale = 1;
+                        zoomState.translateX = 0;
+                        zoomState.translateY = 0;
+                        applyZoomTransform();
+                    }
+                }
+            });
+
+            // マウスホイールでズーム（PC対応）
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                const newScale = zoomState.scale * delta;
+                zoomState.scale = Math.max(zoomState.minScale, Math.min(zoomState.maxScale, newScale));
+                clampTranslate();
+                applyZoomTransform();
+            }, { passive: false });
+        })();
 
 
         // ========== 編集モーダル ========== //
