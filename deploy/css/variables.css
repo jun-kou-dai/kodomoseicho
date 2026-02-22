@@ -7,6 +7,9 @@
     --primary-pink-dark: #E91E63;
     --primary-pink-light: rgba(255, 107, 157, 0.15);
 
+    /* アクセント（ピンク系） */
+    --accent-pink: #FF6B9D;
+
     /* アクセント（ブルー系） */
     --accent-blue: #42A5F5;
     --accent-blue-dark: #1E88E5;
