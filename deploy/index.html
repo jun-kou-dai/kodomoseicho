@@ -2280,6 +2280,7 @@
         // ========== 詳細モーダル ========== //
 
         let currentRecordId = null;
+        let pendingDeleteTargetId = null;
         let currentRecordData = null;
         let currentPhotoIndex = 0;
 
@@ -2488,13 +2489,11 @@
 
                     // 削除ボタン
                     document.getElementById('deleteRecordBtn').addEventListener('click', () => {
-                        const deleteTargetId = currentRecordId;
+                        pendingDeleteTargetId = currentRecordId;
                         closeDetailModal();
                         setTimeout(() => {
                             const delModal = document.getElementById('deleteConfirmDialog');
                             const delOverlay = document.getElementById('deleteConfirmOverlay');
-                            // 削除対象IDをダイアログ要素に保存（staleクロージャ対策）
-                            delModal.dataset.targetId = deleteTargetId;
                             delOverlay.classList.add('show');
                             setTimeout(() => delModal.classList.add('show'), 100);
 
@@ -2504,15 +2503,14 @@
                                 document.getElementById('deleteConfirmOverlay').addEventListener('click', closeDeleteDialog);
 
                                 document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
-                                    const targetId = delModal.dataset.targetId;
-                                    if (!targetId) return;
+                                    if (!pendingDeleteTargetId) return;
                                     const confirmBtn = document.getElementById('confirmDeleteBtn');
                                     confirmBtn.disabled = true;
                                     confirmBtn.textContent = '削除中...';
 
                                     try {
                                         // 論理削除
-                                        await db.collection('records').doc(targetId).update({
+                                        await db.collection('records').doc(pendingDeleteTargetId).update({
                                             isDeleted: true,
                                             deletedAt: firebase.firestore.FieldValue.serverTimestamp()
                                         });
@@ -2782,6 +2780,10 @@
             const overlay = document.getElementById('deleteConfirmOverlay');
             modal.classList.remove('show');
             setTimeout(() => overlay.classList.remove('show'), 300);
+            // ボタン状態をリセット（2回目以降の削除に対応）
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = '削除する';
         }
 
 
