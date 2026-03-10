@@ -439,3 +439,557 @@
     user-select: none;
     -webkit-user-drag: none;
 }
+
+/* ========== スライドショー ========== */
+.slideshow-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+}
+.slideshow-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+.slideshow-container {
+    position: fixed;
+    inset: 0;
+    z-index: 501;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+.slideshow-container.show {
+    pointer-events: auto;
+    opacity: 1;
+}
+/* 写真レイヤー（クロスフェード用に2枚重ね） */
+.slideshow-photo-layer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    will-change: opacity, transform, clip-path;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+.slideshow-photo-layer.active {
+    opacity: 1;
+}
+.slideshow-photo-layer img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
+}
+
+/* ===== トランジション @keyframes — GPU合成のみ(transform+opacity) ===== */
+
+/* 1. ディゾルブ: クリーンなクロスフェード */
+@keyframes ss-dissolve-in {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+}
+@keyframes ss-dissolve-out {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* 2. スライド: transformのみ（暗転はオーバーレイで） */
+@keyframes ss-push-in-next {
+    0%   { transform: translate3d(100%, 0, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes ss-push-in-prev {
+    0%   { transform: translate3d(-100%, 0, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes ss-push-out-next {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    100% { transform: translate3d(-40%, 0, 0) scale(0.85); }
+}
+@keyframes ss-push-out-prev {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    100% { transform: translate3d(40%, 0, 0) scale(0.85); }
+}
+
+/* 3. ワイプ: clip-path */
+@keyframes ss-wipe-in {
+    0%   { clip-path: inset(0 100% 0 0); -webkit-clip-path: inset(0 100% 0 0); }
+    100% { clip-path: inset(0 0 0 0); -webkit-clip-path: inset(0 0 0 0); }
+}
+
+/* 4. シネマ: transform+opacityのみ（暗転はオーバーレイで） */
+@keyframes ss-cinema-in {
+    0%   { opacity: 0; transform: scale(1.35) translate3d(0, 0, 0); }
+    60%  { opacity: 1; }
+    100% { opacity: 1; transform: scale(1) translate3d(0, 0, 0); }
+}
+@keyframes ss-cinema-out {
+    0%   { opacity: 1; transform: scale(1) translate3d(0, 0, 0); }
+    100% { opacity: 0; transform: scale(0.75) translate3d(0, 0, 0); }
+}
+
+/* 暗転用オーバーレイ — GPU合成(opacity)のみ */
+.ss-dark-overlay {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    will-change: opacity;
+}
+
+/* Ken Burns アニメーション（4パターン・やや控えめに） */
+@keyframes kenburns-1 {
+    0% { transform: scale(1) translate3d(0, 0, 0); }
+    100% { transform: scale(1.08) translate3d(-1.5%, -1%, 0); }
+}
+@keyframes kenburns-2 {
+    0% { transform: scale(1.06) translate3d(-1.5%, 0.5%, 0); }
+    100% { transform: scale(1) translate3d(0, 0, 0); }
+}
+@keyframes kenburns-3 {
+    0% { transform: scale(1) translate3d(0.5%, 0, 0); }
+    100% { transform: scale(1.07) translate3d(-1%, 1.5%, 0); }
+}
+@keyframes kenburns-4 {
+    0% { transform: scale(1.06) translate3d(0.5%, -0.5%, 0); }
+    100% { transform: scale(1.01) translate3d(-0.5%, 0.5%, 0); }
+}
+.slideshow-photo-layer img.kb-1 { animation: kenburns-1 12s ease-in-out forwards; }
+.slideshow-photo-layer img.kb-2 { animation: kenburns-2 12s ease-in-out forwards; }
+.slideshow-photo-layer img.kb-3 { animation: kenburns-3 12s ease-in-out forwards; }
+.slideshow-photo-layer img.kb-4 { animation: kenburns-4 12s ease-in-out forwards; }
+
+/* 情報オーバーレイ（下部 — コントロールバーの上に配置） */
+.slideshow-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 60px 24px 140px;
+    padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(transparent, rgba(0,0,0,0.75));
+    color: #fff;
+    z-index: 2;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+.slideshow-info-date {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+.slideshow-info-comment {
+    font-size: 16px;
+    line-height: 1.5;
+    font-weight: 400;
+    max-height: 72px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+.slideshow-info-category {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.2);
+    margin-top: 6px;
+}
+
+/* カウンター（右上） */
+.slideshow-counter {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+    z-index: 3;
+    font-variant-numeric: tabular-nums;
+}
+
+/* コントロールバー */
+.slideshow-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    padding: 0 16px 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+    background: linear-gradient(transparent, rgba(0,0,0,0.5));
+}
+.slideshow-controls.hidden-controls {
+    opacity: 0;
+    pointer-events: none;
+}
+.slideshow-progress {
+    display: none;
+}
+.slideshow-progress-bar {
+    display: none;
+}
+.slideshow-btn-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.ss-btn {
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.ss-btn:hover, .ss-btn:active {
+    background: rgba(255,255,255,0.3);
+}
+.ss-btn.ss-play {
+    width: 56px;
+    height: 56px;
+    font-size: 24px;
+    background: rgba(255,255,255,0.25);
+}
+.ss-btn-close {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 5;
+}
+/* 速度ラベル */
+.ss-speed-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+    min-width: 30px;
+    text-align: center;
+}
+/* BGM Panel */
+.slideshow-bgm-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px 4px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 16px 16px 0 0;
+    margin: 0 8px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    max-height: 260px;
+}
+.ss-bgm-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 0 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+}
+.ss-bgm-tabs::-webkit-scrollbar { display: none; }
+.ss-bgm-tab {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.6);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
+}
+.ss-bgm-tab:hover { background: rgba(255,255,255,0.12); }
+.ss-bgm-tab.active {
+    border-color: #42A5F5;
+    background: rgba(66,165,245,0.25);
+    color: #fff;
+}
+.ss-bgm-tracks {
+    display: none;
+}
+.ss-bgm-tracks.active {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.ss-bgm-preset-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+}
+.ss-bgm-preset-btn:hover, .ss-bgm-preset-btn:active {
+    background: rgba(255,255,255,0.15);
+}
+.ss-bgm-preset-btn.active {
+    border-color: #42A5F5;
+    background: rgba(66,165,245,0.25);
+}
+.ss-bgm-icon { font-size: 16px; flex-shrink: 0; }
+.ss-bgm-label { font-size: 11px; opacity: 0.85; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-bgm-custom-label { cursor: pointer; }
+.ss-bgm-util-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.ss-bgm-util-row .ss-bgm-preset-btn {
+    flex: 1;
+    justify-content: center;
+}
+.ss-bgm-volume-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.ss-volume {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 80px;
+    height: 3px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    outline: none;
+}
+.ss-volume::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+}
+.ss-bgm-name {
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Settings Modal */
+.ss-settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 499;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.ss-settings-overlay.show { opacity: 1; }
+.ss-settings-overlay.hidden { display: none; }
+.ss-settings-modal {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-radius: 24px 24px 0 0;
+    z-index: 500;
+    max-height: 85vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    font-family: 'Noto Sans JP', sans-serif;
+}
+.ss-settings-modal.show { transform: translateY(0); }
+.ss-settings-modal.hidden { display: none; }
+.ss-settings-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #eee;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    border-radius: 24px 24px 0 0;
+    z-index: 1;
+}
+.ss-settings-close-btn {
+    width: 36px; height: 36px;
+    border: none; background: #f0f0f0;
+    border-radius: 50%; font-size: 16px;
+    cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    color: #333;
+}
+.ss-settings-title {
+    flex: 1; text-align: center;
+    font-size: 16px; font-weight: 600;
+    color: #333; margin-right: 36px;
+}
+.ss-settings-body { padding: 16px 20px; }
+.ss-settings-section { margin-bottom: 20px; }
+.ss-settings-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 8px;
+}
+.ss-settings-date-row {
+    display: flex; align-items: center; gap: 8px;
+}
+.ss-settings-date {
+    flex: 1; padding: 10px 12px;
+    border: 1.5px solid #ddd;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: #333;
+    background: #fafafa;
+}
+.ss-settings-date-sep { color: #999; font-size: 14px; }
+.ss-settings-categories {
+    display: flex; flex-wrap: wrap; gap: 8px;
+}
+.ss-cat-chip {
+    display: inline-flex; align-items: center;
+    padding: 8px 14px;
+    border: 1.5px solid #ddd;
+    border-radius: 20px;
+    font-size: 13px; color: #555;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+.ss-cat-chip.active {
+    border-color: #42A5F5;
+    background: #E3F2FD;
+    color: #1565C0;
+    font-weight: 500;
+}
+.ss-settings-speed-row {
+    display: flex; gap: 8px;
+}
+.ss-speed-opt {
+    flex: 1; padding: 10px;
+    border: 1.5px solid #ddd;
+    border-radius: 10px;
+    background: #fafafa;
+    font-size: 14px; color: #555;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Noto Sans JP', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+.ss-speed-opt.active {
+    border-color: #42A5F5;
+    background: #E3F2FD;
+    color: #1565C0;
+    font-weight: 600;
+}
+.ss-settings-toggle-row {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.ss-toggle {
+    width: 48px; height: 28px;
+    background: #ddd;
+    border-radius: 14px;
+    position: relative;
+    transition: background 0.2s ease;
+    cursor: pointer;
+}
+.ss-toggle.on { background: #42A5F5; }
+.ss-toggle-knob {
+    width: 22px; height: 22px;
+    background: #fff;
+    border-radius: 50%;
+    position: absolute;
+    top: 3px; left: 3px;
+    transition: left 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.ss-toggle.on .ss-toggle-knob { left: 23px; }
+.ss-transition-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+.ss-transition-opt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 6px;
+    border: 1.5px solid #ddd;
+    border-radius: 12px;
+    background: #fafafa;
+    font-size: 11px;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Noto Sans JP', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+.ss-transition-opt.active {
+    border-color: #42A5F5;
+    background: #E3F2FD;
+    color: #1565C0;
+    font-weight: 600;
+}
+.ss-transition-icon {
+    font-size: 22px;
+    line-height: 1;
+}
+.ss-settings-footer {
+    padding: 12px 20px 24px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+.ss-settings-start-btn {
+    width: 100%; padding: 14px;
+    background: #42A5F5;
+    color: #fff; border: none;
+    border-radius: 14px;
+    font-size: 16px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-family: 'Noto Sans JP', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+.ss-settings-start-btn:hover, .ss-settings-start-btn:active {
+    background: #1E88E5;
+}

@@ -51,6 +51,9 @@
                     <span class="dropdown-icon">▼</span>
                 </button>
                 <div class="header-actions">
+                    <button id="slideshowButton" class="header-icon-btn" title="スライドショー" onclick="startTimelineSlideshow()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                    </button>
                     <button id="searchButton" class="header-icon-btn" title="検索">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     </button>
@@ -444,6 +447,9 @@
             <button id="closeAlbumModal" class="btn-close">×</button>
             <h2 id="albumModalTitle" class="modal-title">2026年1月</h2>
             <span id="albumModalAge" class="month-age" style="font-size:11px;"></span>
+            <button id="albumSlideshowBtn" class="header-icon-btn" title="スライドショー" style="margin-left:auto;width:32px;height:32px;" onclick="startAlbumSlideshow()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+            </button>
         </div>
         <div class="modal-body" style="padding:12px;">
             <div id="albumGrid" class="album-grid">
@@ -2153,8 +2159,8 @@
                                 return;
                             }
                         } else {
-                            if (file.size > 5 * 1024 * 1024) {
-                                showToast('画像は5MB以下にしてください', 'error');
+                            if (file.size > 30 * 1024 * 1024) {
+                                showToast('画像は30MB以下にしてください', 'error');
                                 input.value = '';
                                 return;
                             }
@@ -3191,8 +3197,8 @@
                         return;
                     }
 
-                    if (file.size > 5 * 1024 * 1024) {
-                        showToast('ファイルサイズは5MB以下にしてください', 'error');
+                    if (file.size > 30 * 1024 * 1024) {
+                        showToast('ファイルサイズは30MB以下にしてください', 'error');
                         return;
                     }
 
@@ -3396,8 +3402,8 @@
                     const file = e.target.files[0];
                     if (!file) return;
 
-                    if (file.size > 5 * 1024 * 1024) {
-                        showToast('ファイルサイズは5MB以下にしてください', 'error');
+                    if (file.size > 30 * 1024 * 1024) {
+                        showToast('ファイルサイズは30MB以下にしてください', 'error');
                         e.target.value = '';
                         return;
                     }
@@ -3928,7 +3934,1142 @@ ${appUrl}`;
 
 
 
-    </script>
-</body>
 
+        // ========== スライドショー機能 ========== //
+        // ========== スライドショー機能 ========== //
+        function __ssDebug(msg) { console.log('[SS]', msg); }
+        __ssDebug('checkpoint: slideshow section reached');
+
+        const SS = {
+            photos: [],         // { url, date, comment, category }
+            index: 0,
+            playing: false,
+            timer: null,
+            progressTimer: null,
+            speed: 5,           // 秒
+            speeds: [3, 5, 8],
+            speedIdx: 1,
+            activeLayer: 1,     // 1 or 2
+            kbIndex: 0,
+            controlsTimer: null,
+            bgmLoaded: false,
+            bgmUrl: null,       // BGMのblob URLを追跡（メモリリーク防止）
+            loadId: 0,          // 画像読み込みID（レースコンディション防止）
+            transition: 'dissolve', // dissolve | slide | wipe | cinema
+            slideDirection: 'next',  // next | prev（スライド方向）
+            transitionTimeouts: [],  // 実行中のトランジションタイマー
+        };
+
+        const categoryLabels = {
+            daily: '日常', meal: '食事', play: '遊び', outing: 'おでかけ', growth: '成長'
+        };
+
+        /**
+         * スライドショーを開く
+         */
+        /**
+         * 画像プリロード - 次の数枚を事前読み込み
+         */
+        function preloadSlideshowImages(startIndex, count) {
+            if (!SS.photos || SS.photos.length === 0) return;
+            for (let i = 1; i <= count; i++) {
+                const idx = (startIndex + i) % SS.photos.length;
+                const url = SS.photos[idx]?.url;
+                if (url) {
+                    const img = new Image();
+                    img.src = url;
+                }
+            }
+        }
+
+        function openSlideshow(photos) {
+            if (!photos || photos.length === 0) {
+                showToast('写真がありません', 'error');
+                return;
+            }
+            SS.photos = photos;
+            SS.index = 0;
+            SS.activeLayer = 1;
+            SS.kbIndex = 0;
+
+            // 最初の数枚をプリロード
+            preloadSlideshowImages(-1, Math.min(3, photos.length));
+
+            const overlay = document.getElementById('slideshowOverlay');
+            const container = document.getElementById('slideshowContainer');
+            overlay.classList.add('show');
+            setTimeout(() => container.classList.add('show'), 50);
+
+            showSlideshowPhoto(0, true);
+            slideshowPlay();
+            showSlideshowControls();
+
+            // BGMコントロール遅延初期化
+            if (!bgmControlsInitialized) {
+                try { initBgmControls(); bgmControlsInitialized = true; } catch(e) { console.warn('initBgmControls:', e); }
+            }
+
+            // BGM自動再生 — ピアノ「Beautiful Dream」をデフォルトで再生
+            var defaultBgmBtn = document.querySelector('.ss-bgm-preset-btn[data-bgm="assets/bgm/piano1.mp3"]');
+            if (defaultBgmBtn) {
+                playBgmPreset(defaultBgmBtn);
+            }
+
+            // タップで操作表示切り替え
+            if (!container.hasAttribute('data-ss-init')) {
+                container.setAttribute('data-ss-init', 'true');
+
+                container.addEventListener('click', (e) => {
+                    if (e.target.closest('.slideshow-controls, .ss-btn, .ss-btn-close, .ss-bgm-custom-label, .ss-volume, .slideshow-bgm-panel')) return;
+                    toggleSlideshowControls();
+                });
+
+                // スワイプ対応
+                let touchStartX = 0;
+                container.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+                container.addEventListener('touchend', (e) => {
+                    const diff = e.changedTouches[0].screenX - touchStartX;
+                    if (Math.abs(diff) > 50) {
+                        diff > 0 ? slideshowPrev() : slideshowNext();
+                    }
+                }, { passive: true });
+
+                // キーボード
+                document.addEventListener('keydown', (e) => {
+                    if (!document.getElementById('slideshowContainer').classList.contains('show')) return;
+                    if (e.key === 'Escape') closeSlideshow();
+                    else if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); slideshowNext(); }
+                    else if (e.key === 'ArrowLeft') slideshowPrev();
+                });
+            }
+        }
+
+        /**
+         * トランジションエンジン — 4種類のプロ品質トランジション
+         */
+        const SSTransitions = {
+            resetLayer: function(layer) {
+                layer.style.animation = '';
+                layer.style.transition = 'none';
+                layer.style.transform = 'translate3d(0, 0, 0)';
+                layer.style.opacity = '';
+                layer.style.zIndex = '';
+                layer.style.clipPath = '';
+                layer.style.webkitClipPath = '';
+                // オーバーレイリセット
+                var ov = layer.querySelector('.ss-dark-overlay');
+                if (ov) { ov.style.transition = 'none'; ov.style.opacity = '0'; }
+            },
+
+            clearTimeouts: function() {
+                for (var i = 0; i < SS.transitionTimeouts.length; i++) {
+                    clearTimeout(SS.transitionTimeouts[i]);
+                }
+                SS.transitionTimeouts = [];
+            },
+
+            cleanup: function(newLayer, prevLayer) {
+                prevLayer.classList.remove('active');
+                SSTransitions.resetLayer(prevLayer);
+                SSTransitions.resetLayer(newLayer);
+                newLayer.style.opacity = '1';
+                newLayer.classList.add('active');
+            },
+
+            apply: function(type, newLayer, prevLayer, immediate) {
+                this.clearTimeouts();
+                this.resetLayer(newLayer);
+                this.resetLayer(prevLayer);
+                prevLayer.classList.remove('active');
+                newLayer.classList.remove('active');
+
+                if (immediate) {
+                    prevLayer.style.opacity = '0';
+                    newLayer.style.opacity = '1';
+                    newLayer.classList.add('active');
+                    return;
+                }
+
+                switch (type) {
+                    case 'slide':    this.slide(newLayer, prevLayer); break;
+                    case 'wipe':     this.wipe(newLayer, prevLayer); break;
+                    case 'cinema':   this.cinema(newLayer, prevLayer); break;
+                    default:         this.dissolve(newLayer, prevLayer); break;
+                }
+            },
+
+            /**
+             * 1. ディゾルブ — クリーンなクロスフェード
+             * GPU合成(opacity)のみ。1.2秒。対称イージング。
+             */
+            dissolve: function(newLayer, prevLayer) {
+                var easingIn = 'cubic-bezier(0.45, 0, 0.55, 1)';
+                var easingOut = 'cubic-bezier(0, 0, 0.58, 1)';  // ease-out: 旧写真を素早く消す
+                prevLayer.style.zIndex = '1';
+                newLayer.style.zIndex = '2';
+                newLayer.style.opacity = '0';
+                newLayer.classList.add('active');
+                newLayer.style.animation = 'ss-dissolve-in 1.0s ' + easingIn + ' forwards';
+                prevLayer.style.animation = 'ss-dissolve-out 0.4s ' + easingOut + ' forwards';
+
+                var t = setTimeout(function() {
+                    SSTransitions.cleanup(newLayer, prevLayer);
+                }, 1100);
+                SS.transitionTimeouts.push(t);
+            },
+
+            /**
+             * 2. スライド — パララックス + オーバーレイ暗転
+             * GPU合成(transform+opacity)のみ。0.45秒。iOS風イージング。
+             */
+            slide: function(newLayer, prevLayer) {
+                var dir = SS.slideDirection === 'prev' ? 'prev' : 'next';
+                var easing = 'cubic-bezier(0.25, 1, 0.5, 1)';
+
+                // 旧写真は即消し — 新写真のスライドインだけ見せる
+                prevLayer.style.transition = 'opacity 0.12s ease-out';
+                prevLayer.style.opacity = '0';
+                prevLayer.style.zIndex = '1';
+                newLayer.style.opacity = '1';
+                newLayer.style.zIndex = '2';
+                newLayer.classList.add('active');
+
+                newLayer.style.animation = 'ss-push-in-' + dir + ' 0.45s ' + easing + ' forwards';
+
+                var t = setTimeout(function() {
+                    SSTransitions.cleanup(newLayer, prevLayer);
+                }, 500);
+                SS.transitionTimeouts.push(t);
+            },
+
+            /**
+             * 3. ワイプ — clip-pathで左→右に開く
+             * 0.9秒。対称イージング。
+             */
+            wipe: function(newLayer, prevLayer) {
+                var easing = 'cubic-bezier(0.45, 0, 0.55, 1)';
+                // 旧写真は即消し — ワイプは黒背景の上に新写真が開く
+                prevLayer.style.transition = 'opacity 0.15s ease-out';
+                prevLayer.style.opacity = '0';
+                prevLayer.style.zIndex = '1';
+                newLayer.style.opacity = '1';
+                newLayer.style.zIndex = '2';
+                newLayer.classList.add('active');
+                newLayer.style.clipPath = 'inset(0 100% 0 0)';
+                newLayer.style.webkitClipPath = 'inset(0 100% 0 0)';
+
+                newLayer.style.animation = 'ss-wipe-in 0.9s ' + easing + ' forwards';
+
+                var t = setTimeout(function() {
+                    SSTransitions.cleanup(newLayer, prevLayer);
+                }, 1000);
+                SS.transitionTimeouts.push(t);
+            },
+
+            /**
+             * 4. シネマ — 大ズーム + オーバーレイ暗転
+             * GPU合成(transform+opacity)のみ。1.4秒。ゆっくり着地イージング。
+             */
+            cinema: function(newLayer, prevLayer) {
+                var easingIn = 'cubic-bezier(0.16, 1, 0.3, 1)';
+                var easingOut = 'cubic-bezier(0, 0, 0.58, 1)';  // ease-out: 旧写真を素早く消す
+                prevLayer.style.zIndex = '1';
+                newLayer.style.zIndex = '2';
+                newLayer.style.opacity = '0';
+                newLayer.classList.add('active');
+                newLayer.style.animation = 'ss-cinema-in 1.4s ' + easingIn + ' forwards';
+                prevLayer.style.animation = 'ss-cinema-out 0.5s ' + easingOut + ' forwards';
+                // 旧レイヤー暗転 — 素早く
+                var ov = prevLayer.querySelector('.ss-dark-overlay');
+                if (ov) {
+                    ov.style.transition = 'opacity 0.4s ' + easingOut;
+                    ov.style.opacity = '0.5';
+                }
+
+                var t = setTimeout(function() {
+                    SSTransitions.cleanup(newLayer, prevLayer);
+                }, 1500);
+                SS.transitionTimeouts.push(t);
+            }
+        };
+
+        /**
+         * 写真を表示（トランジションエンジン統合版）
+         */
+        function showSlideshowPhoto(index, immediate) {
+            if (index < 0) index = SS.photos.length - 1;
+            if (index >= SS.photos.length) index = 0;
+            SS.index = index;
+
+            const photo = SS.photos[index];
+            const nextLayer = SS.activeLayer === 1 ? 2 : 1;
+            const layer = document.getElementById('ssLayer' + nextLayer);
+            const img = document.getElementById('ssImg' + nextLayer);
+            const prevLayer = document.getElementById('ssLayer' + SS.activeLayer);
+
+            // Ken Burns パターンを順番に選択
+            SS.kbIndex = (SS.kbIndex % 4) + 1;
+            const kbClass = 'kb-' + SS.kbIndex;
+
+            // レースコンディション防止: 読み込みIDで古いonloadを無視
+            SS.loadId++;
+            const thisLoadId = SS.loadId;
+
+            // Ken Burnsアニメーションをリセット（クラス変更で自動再開、リフロー不要）
+            img.className = '';
+
+            let transitionFired = false;
+            const applyTransition = () => {
+                // 二重実行防止（onloadとcomplete両方で発火するケース対策）
+                if (transitionFired) return;
+                // 古い読み込みのonloadが遅延発火した場合は無視
+                if (SS.loadId !== thisLoadId) return;
+                transitionFired = true;
+                img.onload = null; // 不要なonload発火を防止
+
+                // Ken Burnsアニメーション適用
+                img.className = kbClass;
+
+                // トランジションエンジンで切り替え実行
+                SSTransitions.apply(
+                    SS.transition || 'dissolve',
+                    layer,
+                    prevLayer,
+                    immediate
+                );
+
+                SS.activeLayer = nextLayer;
+            };
+
+            img.onload = applyTransition;
+            img.onerror = () => {
+                // 画像読み込みエラー時はスキップして次へ
+                if (SS.loadId !== thisLoadId) return;
+                console.warn('Slideshow: image load failed', photo.url);
+                if (SS.playing && SS.photos.length > 1) {
+                    setTimeout(() => slideshowNext(), 500);
+                }
+            };
+
+            // キャッシュ済み画像の場合は直接トランジション実行
+            if (img.src === photo.url && img.complete) {
+                applyTransition();
+            } else {
+                img.src = photo.url;
+                // 既にキャッシュされている場合のフォールバック
+                if (img.complete) applyTransition();
+            }
+
+            // 情報オーバーレイ更新
+            document.getElementById('ssDate').textContent = photo.date || '';
+            document.getElementById('ssComment').textContent = photo.comment || '';
+            const catEl = document.getElementById('ssCategory');
+            if (photo.category && categoryLabels[photo.category]) {
+                catEl.textContent = categoryLabels[photo.category];
+                catEl.style.display = 'inline-block';
+            } else {
+                catEl.style.display = 'none';
+            }
+
+            // カウンター
+            document.getElementById('ssCounter').textContent = `${index + 1} / ${SS.photos.length}`;
+
+            // 次の5枚をプリロード（ネットワーク遅延によるトランジション遅延を防止）
+            preloadSlideshowImages(index, 5);
+
+            // プログレスバー更新開始（再生中の場合のみ）
+            if (SS.playing) startProgressBar();
+        }
+
+        /**
+         * プログレスバー
+         */
+        function startProgressBar() {
+            const bar = document.getElementById('ssProgressBar');
+            bar.style.transition = 'none';
+            bar.style.width = '0%';
+            if (SS.progressTimer) clearInterval(SS.progressTimer);
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    bar.style.transition = `width ${SS.speed}s linear`;
+                    bar.style.width = '100%';
+                });
+            });
+        }
+
+        /**
+         * 再生
+         */
+        function slideshowPlay() {
+            SS.playing = true;
+            document.getElementById('ssPlayBtn').innerHTML = '⏸';
+            clearInterval(SS.timer);
+            SS.timer = setInterval(() => {
+                slideshowNext();
+            }, SS.speed * 1000);
+            startProgressBar();
+        }
+
+        /**
+         * 一時停止
+         */
+        function slideshowPause() {
+            SS.playing = false;
+            document.getElementById('ssPlayBtn').innerHTML = '▶';
+            clearInterval(SS.timer);
+            SS.timer = null;
+            // プログレスバーを現在位置で停止
+            const bar = document.getElementById('ssProgressBar');
+            const computed = getComputedStyle(bar);
+            bar.style.transition = 'none';
+            bar.style.width = computed.width;
+        }
+
+        function toggleSlideshowPlay() {
+            SS.playing ? slideshowPause() : slideshowPlay();
+        }
+
+        function slideshowNext() {
+            SS.slideDirection = 'next';
+            showSlideshowPhoto(SS.index + 1, false);
+            if (SS.playing) {
+                clearInterval(SS.timer);
+                SS.timer = setInterval(() => slideshowNext(), SS.speed * 1000);
+            }
+        }
+
+        function slideshowPrev() {
+            SS.slideDirection = 'prev';
+            showSlideshowPhoto(SS.index - 1, false);
+            if (SS.playing) {
+                clearInterval(SS.timer);
+                SS.timer = setInterval(() => slideshowNext(), SS.speed * 1000);
+            }
+        }
+
+        /**
+         * 速度変更
+         */
+        function cycleSlideshowSpeed() {
+            SS.speedIdx = (SS.speedIdx + 1) % SS.speeds.length;
+            SS.speed = SS.speeds[SS.speedIdx];
+            document.getElementById('ssSpeedLabel').textContent = SS.speed + '秒';
+            if (SS.playing) {
+                clearInterval(SS.timer);
+                SS.timer = setInterval(() => slideshowNext(), SS.speed * 1000);
+                startProgressBar();
+            }
+        }
+
+        /**
+         * コントロール表示/非表示
+         */
+        function showSlideshowControls() {
+            const controls = document.getElementById('ssControls');
+            const counter = document.getElementById('ssCounter');
+            const closeBtn = document.getElementById('ssCloseBtn');
+            controls.classList.remove('hidden-controls');
+            counter.style.opacity = '1';
+            closeBtn.style.opacity = '1';
+            resetControlsAutoHide();
+        }
+
+        function hideSlideshowControls() {
+            const controls = document.getElementById('ssControls');
+            const counter = document.getElementById('ssCounter');
+            const closeBtn = document.getElementById('ssCloseBtn');
+            controls.classList.add('hidden-controls');
+            counter.style.opacity = '0';
+            closeBtn.style.opacity = '0';
+            // ssInfo（日付・コメント・カテゴリ）は常に表示
+        }
+
+        function toggleSlideshowControls() {
+            const controls = document.getElementById('ssControls');
+            if (controls.classList.contains('hidden-controls')) {
+                showSlideshowControls();
+            } else {
+                hideSlideshowControls();
+            }
+        }
+
+        function resetControlsAutoHide() {
+            clearTimeout(SS.controlsTimer);
+            SS.controlsTimer = setTimeout(() => {
+                if (SS.playing) hideSlideshowControls();
+            }, 4000);
+        }
+
+        /**
+         * BGM and Settings State
+         */
+        const SSSettings = {
+            mode: 'timeline',
+            shuffle: false,
+            categories: ['daily', 'meal', 'play', 'outing', 'growth'],
+            speed: 5,
+            dateFrom: null,
+            dateTo: null,
+        };
+
+        function toggleBgmPanel() {
+            const panel = document.getElementById('ssBgmPanel');
+            panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+            // BGMパネルを開いた時にアクティブカテゴリの曲をプリロード
+            if (panel.style.display !== 'none') {
+                preloadActiveBgmCategory();
+            }
+        }
+        function preloadActiveBgmCategory() {
+            var activePanel = document.querySelector('.ss-bgm-tracks.active');
+            if (!activePanel) return;
+            var cat = activePanel.getAttribute('data-cat');
+            if (window['_bgmPreloaded_' + cat]) return;
+            window['_bgmPreloaded_' + cat] = true;
+            var btns = activePanel.querySelectorAll('.ss-bgm-preset-btn[data-bgm]');
+            for (var i = 0; i < btns.length; i++) {
+                var a = new Audio();
+                a.preload = 'auto';
+                a.src = btns[i].getAttribute('data-bgm');
+            }
+        }
+
+        // playBgmPresetは独立スクリプトで定義済み
+
+        function initBgmControls() {
+            const audio = document.getElementById('ssBgmAudio');
+            const volumeSlider = document.getElementById('ssVolume');
+            const muteBtn = document.getElementById('ssMuteBtn');
+            const fileInput = document.getElementById('ssBgmFileInput');
+            const bgmName = document.getElementById('ssBgmName');
+
+            // BGMプリセットはonclick属性で処理（playBgmPreset関数）
+
+            volumeSlider.addEventListener('input', () => {
+                audio.volume = volumeSlider.value / 100;
+                muteBtn.textContent = audio.volume === 0 ? '🔇' : '🔊';
+            });
+
+            muteBtn.addEventListener('click', () => {
+                if (audio.muted) {
+                    audio.muted = false;
+                    muteBtn.textContent = '🔊';
+                } else {
+                    audio.muted = true;
+                    muteBtn.textContent = '🔇';
+                }
+            });
+
+            // 同じファイルの再選択を可能にする
+            fileInput.addEventListener('click', () => { fileInput.value = ''; });
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // 古いblob URLを解放
+                if (SS.bgmUrl) {
+                    URL.revokeObjectURL(SS.bgmUrl);
+                }
+
+                // Remove active class from all presets when custom file is selected
+                document.querySelectorAll('.ss-bgm-preset-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+
+                const url = URL.createObjectURL(file);
+                SS.bgmUrl = url;
+                audio.src = url;
+                audio.load();
+                audio.volume = volumeSlider.value / 100;
+                audio.play().catch(err => console.warn('BGM play error:', err));
+                bgmName.textContent = file.name.replace(/\.[^.]+$/, '');
+                SS.bgmLoaded = true;
+            });
+        }
+        // initBgmControls は openSlideshow 内で遅延初期化する（DOM要素がスクリプト後に配置されているため）
+        let bgmControlsInitialized = false;
+
+        /**
+         * スライドショーを閉じる
+         */
+        function closeSlideshow() {
+            clearInterval(SS.timer);
+            clearInterval(SS.progressTimer);
+            clearTimeout(SS.controlsTimer);
+            SS.timer = null;
+            SS.progressTimer = null;
+            SS.playing = false;
+
+            // トランジションエンジンのタイマーをすべてクリア
+            SSTransitions.clearTimeouts();
+
+            const audio = document.getElementById('ssBgmAudio');
+            audio.pause();
+            audio.currentTime = 0;
+
+            // BGM blob URLを解放（メモリリーク防止）
+            if (SS.bgmUrl) {
+                URL.revokeObjectURL(SS.bgmUrl);
+                SS.bgmUrl = null;
+            }
+
+            const container = document.getElementById('slideshowContainer');
+            const overlay = document.getElementById('slideshowOverlay');
+            container.classList.remove('show');
+            setTimeout(() => {
+                overlay.classList.remove('show');
+                // レイヤー状態を完全リセット（次回オープン時の初期状態に戻す）
+                var layer1 = document.getElementById('ssLayer1');
+                var layer2 = document.getElementById('ssLayer2');
+                SSTransitions.resetLayer(layer1);
+                SSTransitions.resetLayer(layer2);
+                layer1.classList.add('active');
+                layer1.style.opacity = '1';
+                layer2.classList.remove('active');
+                document.getElementById('ssImg1').src = '';
+                document.getElementById('ssImg2').src = '';
+                document.getElementById('ssImg1').className = '';
+                document.getElementById('ssImg2').className = '';
+                document.getElementById('ssImg1').style.animation = '';
+                document.getElementById('ssImg2').style.animation = '';
+                document.getElementById('ssImg1').onload = null;
+                document.getElementById('ssImg2').onload = null;
+                // ホワイトオーバーレイリセット
+                var wo = document.getElementById('ssWhiteOverlay');
+                if (wo) { wo.style.transition = 'none'; wo.style.opacity = '0'; }
+                SS.activeLayer = 1;
+                SS.kbIndex = 0;
+                SS.loadId = 0;
+                SS.transitionTimeouts = [];
+                // プログレスバーをリセット
+                const bar = document.getElementById('ssProgressBar');
+                bar.style.transition = 'none';
+                bar.style.width = '0%';
+            }, 500);
+
+            // BGMを停止
+            var bgmAudio = document.getElementById('ssBgmAudio');
+            if (bgmAudio) { bgmAudio.pause(); bgmAudio.currentTime = 0; }
+            // BGM行を閉じておく
+            document.getElementById('ssBgmPanel').style.display = 'none';
+            // Remove active class from all preset buttons
+            document.querySelectorAll('.ss-bgm-preset-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            // BGMカテゴリタブをリセット（ピアノを初期表示）
+            document.querySelectorAll('.ss-bgm-tab').forEach(t => t.classList.remove('active'));
+            var firstTab = document.querySelector('.ss-bgm-tab[data-cat="piano"]');
+            if (firstTab) firstTab.classList.add('active');
+            document.querySelectorAll('.ss-bgm-tracks').forEach(p => p.classList.remove('active'));
+            var firstPanel = document.querySelector('.ss-bgm-tracks[data-cat="piano"]');
+            if (firstPanel) firstPanel.classList.add('active');
+            // BGM名をリセット
+            document.getElementById('ssBgmName').textContent = 'BGMなし';
+            SS.bgmLoaded = false;
+            // コントロールを表示状態に戻す（次回オープン時用）
+            document.getElementById('ssControls').classList.remove('hidden-controls');
+        }
+
+        /**
+         * Settings Modal Functions
+         */
+        function openSlideshowSettings(mode) {
+            SSSettings.mode = mode;
+            if (mode === 'timeline') {
+                document.getElementById('ssDateFrom').value = '';
+                document.getElementById('ssDateTo').value = '';
+            }
+            var overlay = document.getElementById('ssSettingsOverlay');
+            var modal = document.getElementById('ssSettingsModal');
+            overlay.style.display = 'block';
+            overlay.style.opacity = '1';
+            modal.style.display = 'block';
+            modal.style.transform = 'translateY(0)';
+
+        }
+
+        function closeSlideshowSettings() {
+            var overlay = document.getElementById('ssSettingsOverlay');
+            var modal = document.getElementById('ssSettingsModal');
+            overlay.style.display = 'none';
+            overlay.style.opacity = '0';
+            modal.style.display = 'none';
+            modal.style.transform = 'translateY(100%)';
+        }
+
+        function formatDateForInput(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        async function startSlideshowWithSettings() {
+            const dateFrom = document.getElementById('ssDateFrom').value;
+            const dateTo = document.getElementById('ssDateTo').value;
+
+            // Validate date range
+            if (dateFrom && dateTo && dateFrom > dateTo) {
+                showToast('開始日は終了日より前に設定してください', 'error');
+                return;
+            }
+
+            // Get selected categories
+            const selectedCats = [];
+            const allChip = document.querySelector('.ss-cat-chip[data-cat="all"]');
+            const isAllSelected = allChip.classList.contains('active');
+            if (!isAllSelected) {
+                document.querySelectorAll('.ss-cat-chip:not([data-cat="all"])').forEach(c => {
+                    if (c.classList.contains('active')) {
+                        selectedCats.push(c.dataset.cat);
+                    }
+                });
+                if (selectedCats.length === 0) {
+                    showToast('カテゴリを1つ以上選択してください', 'error');
+                    return;
+                }
+            }
+
+            // Get speed
+            const speedBtn = document.querySelector('.ss-speed-opt.active');
+            const speed = speedBtn ? parseInt(speedBtn.dataset.speed) : 5;
+            SS.speed = speed;
+            SS.speedIdx = SS.speeds.indexOf(speed);
+            if (SS.speedIdx === -1) SS.speedIdx = 1;
+            document.getElementById('ssSpeedLabel').textContent = speed + '秒';
+
+            // Get shuffle
+            const shuffle = document.getElementById('ssShuffleToggle').classList.contains('on');
+
+            // Get transition type
+            const transitionBtn = document.querySelector('.ss-transition-opt.active');
+            SS.transition = transitionBtn ? transitionBtn.dataset.transition : 'crossfade';
+
+            closeSlideshowSettings();
+            showToast('写真を読み込み中...', 'success');
+
+            try {
+                let query = db.collection('records')
+                    .where('childId', '==', currentChildId);
+
+                // Date filters (must come before orderBy for range conditions on same field)
+                if (dateFrom) {
+                    const fromDate = new Date(dateFrom);
+                    fromDate.setHours(0, 0, 0, 0);
+                    query = query.where('recordDate', '>=', firebase.firestore.Timestamp.fromDate(fromDate));
+                }
+                if (dateTo) {
+                    const toDate = new Date(dateTo);
+                    toDate.setHours(23, 59, 59, 999);
+                    query = query.where('recordDate', '<=', firebase.firestore.Timestamp.fromDate(toDate));
+                }
+
+                // Order by must come after all where clauses for range conditions
+                query = query.orderBy('recordDate', 'desc');
+
+                const snapshot = await query.get();
+
+                const photos = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.isDeleted) return;
+
+                    // Category filter
+                    if (!isAllSelected && !selectedCats.includes(data.category)) return;
+
+                    if (data.photos && data.photos.length > 0) {
+                        const rd = data.recordDate?.toDate ? data.recordDate.toDate() : new Date(data.recordDate);
+                        const dateStr = `${rd.getFullYear()}年${rd.getMonth() + 1}月${rd.getDate()}日`;
+                        data.photos.forEach(p => {
+                            if (!p.type || p.type === 'image') {
+                                photos.push({
+                                    url: p.photoURL,
+                                    date: dateStr,
+                                    comment: data.comment || '',
+                                    category: data.category || ''
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // Reverse to chronological order
+                photos.reverse();
+
+                // Shuffle if enabled
+                if (shuffle) {
+                    for (let i = photos.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [photos[i], photos[j]] = [photos[j], photos[i]];
+                    }
+                }
+
+                if (photos.length === 0) {
+                    showToast('条件に合う写真がありません', 'error');
+                    return;
+                }
+
+                openSlideshow(photos);
+            } catch (error) {
+                console.error('Slideshow error:', error);
+                showToast('読み込みに失敗しました', 'error');
+            }
+        }
+
+        /**
+         * タイムラインの全写真を収集してスライドショー開始
+         */
+        async function startTimelineSlideshow() {
+            if (!currentChildId) {
+                showToast('子供を選択してください', 'error');
+                return;
+            }
+            openSlideshowSettings('timeline');
+        }
+
+        /**
+         * 月別アルバムの写真でスライドショー開始
+         * アルバムモーダルのタイトルから年月を解析し、Firestoreから写真データを取得
+         */
+        async function startAlbumSlideshow() {
+            const titleText = document.getElementById('albumModalTitle').textContent;
+
+            // タイトルから年月を解析（"2026年1月" 形式）
+            const match = titleText.match(/(\d{4})年(\d{1,2})月/);
+            if (!match) {
+                showToast('月の情報を取得できませんでした', 'error');
+                return;
+            }
+            const year = parseInt(match[1]);
+            const month = parseInt(match[2]);
+
+            openSlideshowSettings('album');
+
+            // Pre-fill dates for this month
+            const startDate = new Date(year, month - 1, 1);
+            const endDate = new Date(year, month, 0); // Last day of month
+
+            document.getElementById('ssDateFrom').value = formatDateForInput(startDate);
+            document.getElementById('ssDateTo').value = formatDateForInput(endDate);
+        }
+
+        // スライドショー初期化完了
+        console.log('Slideshow init complete');
+
+
+    </script>
+    <!-- スライドショー用の独立スクリプト（メインスクリプトに依存しない） -->
+    <script>
+        // カテゴリチップ切り替え
+        function toggleCatChip(chip) {
+            try {
+                var cat = chip.dataset.cat;
+                if (cat === 'all') {
+                    var isActive = chip.classList.contains('active');
+                    var allChips = document.querySelectorAll('.ss-cat-chip');
+                    for (var i = 0; i < allChips.length; i++) {
+                        if (isActive) { allChips[i].classList.remove('active'); }
+                        else { allChips[i].classList.add('active'); }
+                    }
+                } else {
+                    chip.classList.toggle('active');
+                    var allChip = document.querySelector('.ss-cat-chip[data-cat="all"]');
+                    var catChips = document.querySelectorAll('.ss-cat-chip:not([data-cat="all"])');
+                    var allActive = true;
+                    for (var j = 0; j < catChips.length; j++) {
+                        if (!catChips[j].classList.contains('active')) { allActive = false; break; }
+                    }
+                    if (allActive) { allChip.classList.add('active'); }
+                    else { allChip.classList.remove('active'); }
+                }
+            } catch(err) { console.error('toggleCatChip error:', err); }
+        }
+
+        // 速度選択
+        function selectSpeed(btn) {
+            var opts = document.querySelectorAll('.ss-speed-opt');
+            for (var i = 0; i < opts.length; i++) { opts[i].classList.remove('active'); }
+            btn.classList.add('active');
+        }
+
+        // トランジション選択
+        function selectTransition(btn) {
+            var opts = document.querySelectorAll('.ss-transition-opt');
+            for (var i = 0; i < opts.length; i++) { opts[i].classList.remove('active'); }
+            btn.classList.add('active');
+        }
+
+        // BGMカテゴリ切り替え
+        function selectBgmCategory(tab) {
+            var tabs = document.querySelectorAll('.ss-bgm-tab');
+            for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+            tab.classList.add('active');
+            var cat = tab.getAttribute('data-cat');
+            var panels = document.querySelectorAll('.ss-bgm-tracks');
+            for (var i = 0; i < panels.length; i++) {
+                if (panels[i].getAttribute('data-cat') === cat) {
+                    panels[i].classList.add('active');
+                } else {
+                    panels[i].classList.remove('active');
+                }
+            }
+            // 選択カテゴリの曲をプリロード
+            preloadActiveBgmCategory();
+        }
+
+        // BGMプリセット再生
+        function stopBgm() {
+            var audio = document.getElementById('ssBgmAudio');
+            if (audio) { audio.pause(); audio.currentTime = 0; }
+            var allBtns = document.querySelectorAll('.ss-bgm-preset-btn');
+            for (var i = 0; i < allBtns.length; i++) allBtns[i].classList.remove('active');
+            var offBtn = document.querySelector('.ss-bgm-preset-btn[data-name="OFF"]');
+            if (offBtn) offBtn.classList.add('active');
+            var bgmName = document.getElementById('ssBgmName');
+            if (bgmName) bgmName.textContent = 'BGMなし';
+        }
+
+        function playBgmPreset(btn) {
+            try {
+                var bgmUrl = btn.getAttribute('data-bgm');
+                if (!bgmUrl) return;
+
+                var audio = document.getElementById('ssBgmAudio');
+                if (!audio) return;
+
+                // 全プリセットからactive削除
+                var allBtns = document.querySelectorAll('.ss-bgm-preset-btn');
+                for (var i = 0; i < allBtns.length; i++) { allBtns[i].classList.remove('active'); }
+                btn.classList.add('active');
+
+                // 再生（load()を呼ばない。srcの設定だけで十分）
+                audio.src = bgmUrl;
+                var vol = document.getElementById('ssVolume');
+                audio.volume = vol ? vol.value / 100 : 0.5;
+                audio.play().then(function() {
+                    var bgmName = document.getElementById('ssBgmName');
+                    if (bgmName) bgmName.textContent = btn.getAttribute('data-name') + ' ♪';
+                }).catch(function(err) {
+                    var bgmName = document.getElementById('ssBgmName');
+                    if (bgmName) bgmName.textContent = '再生失敗: ' + err.message;
+                });
+
+                if (typeof SS !== 'undefined') SS.bgmLoaded = true;
+            } catch(err) { console.error('playBgmPreset error:', err); }
+        }
+    </script>
+
+    <!-- スライドショー設定モーダル -->
+    <div id="ssSettingsOverlay" class="ss-settings-overlay" style="display:none;" onclick="closeSlideshowSettings()"></div>
+    <div id="ssSettingsModal" class="ss-settings-modal" style="display:none;">
+        <div class="ss-settings-header">
+            <button id="ssSettingsClose" class="ss-settings-close-btn" onclick="closeSlideshowSettings()">✕</button>
+            <h3 class="ss-settings-title">スライドショー設定</h3>
+        </div>
+        <div class="ss-settings-body">
+            <div class="ss-settings-section">
+                <label class="ss-settings-label">期間</label>
+                <div class="ss-settings-date-row">
+                    <input type="date" id="ssDateFrom" class="ss-settings-date">
+                    <span class="ss-settings-date-sep">〜</span>
+                    <input type="date" id="ssDateTo" class="ss-settings-date">
+                </div>
+            </div>
+            <div class="ss-settings-section">
+                <label class="ss-settings-label">カテゴリ</label>
+                <div class="ss-settings-categories">
+                    <div class="ss-cat-chip active" data-cat="all" onclick="toggleCatChip(this)">すべて</div>
+                    <div class="ss-cat-chip active" data-cat="daily" onclick="toggleCatChip(this)">🏠 日常</div>
+                    <div class="ss-cat-chip active" data-cat="meal" onclick="toggleCatChip(this)">🍴 食事</div>
+                    <div class="ss-cat-chip active" data-cat="play" onclick="toggleCatChip(this)">🎨 遊び</div>
+                    <div class="ss-cat-chip active" data-cat="outing" onclick="toggleCatChip(this)">🚗 おでかけ</div>
+                    <div class="ss-cat-chip active" data-cat="growth" onclick="toggleCatChip(this)">🌱 成長</div>
+                </div>
+            </div>
+            <div class="ss-settings-section">
+                <label class="ss-settings-label">表示速度</label>
+                <div class="ss-settings-speed-row">
+                    <button class="ss-speed-opt" data-speed="3" onclick="selectSpeed(this)">3秒</button>
+                    <button class="ss-speed-opt active" data-speed="5" onclick="selectSpeed(this)">5秒</button>
+                    <button class="ss-speed-opt" data-speed="8" onclick="selectSpeed(this)">8秒</button>
+                </div>
+            </div>
+            <div class="ss-settings-section">
+                <label class="ss-settings-label">トランジション</label>
+                <div class="ss-transition-row">
+                    <button class="ss-transition-opt active" data-transition="dissolve" onclick="selectTransition(this)">
+                        <span class="ss-transition-icon">✨</span>
+                        <span>ディゾルブ</span>
+                    </button>
+                    <button class="ss-transition-opt" data-transition="slide" onclick="selectTransition(this)">
+                        <span class="ss-transition-icon">➡️</span>
+                        <span>スライド</span>
+                    </button>
+                    <button class="ss-transition-opt" data-transition="wipe" onclick="selectTransition(this)">
+                        <span class="ss-transition-icon">📐</span>
+                        <span>ワイプ</span>
+                    </button>
+                    <button class="ss-transition-opt" data-transition="cinema" onclick="selectTransition(this)">
+                        <span class="ss-transition-icon">🎬</span>
+                        <span>シネマ</span>
+                    </button>
+                </div>
+            </div>
+            <div class="ss-settings-section">
+                <label class="ss-settings-toggle-row">
+                    <span class="ss-settings-label" style="margin-bottom:0;">シャッフル再生</span>
+                    <div class="ss-toggle" id="ssShuffleToggle" onclick="this.classList.toggle('on')">
+                        <div class="ss-toggle-knob"></div>
+                    </div>
+                </label>
+            </div>
+        </div>
+        <div class="ss-settings-footer">
+            <button id="ssSettingsStart" class="ss-settings-start-btn" onclick="startSlideshowWithSettings();">▶ スライドショーを開始</button>
+        </div>
+    </div>
+
+    <!-- スライドショーモーダル -->
+    <div id="slideshowOverlay" class="slideshow-overlay"></div>
+    <div id="slideshowContainer" class="slideshow-container">
+        <!-- 写真レイヤー（クロスフェード用に2枚） -->
+        <div id="ssLayer1" class="slideshow-photo-layer active">
+            <img id="ssImg1" src="" alt="">
+            <div class="ss-dark-overlay"></div>
+        </div>
+        <div id="ssLayer2" class="slideshow-photo-layer">
+            <img id="ssImg2" src="" alt="">
+            <div class="ss-dark-overlay"></div>
+        </div>
+
+        <!-- ソフトホワイト用オーバーレイ -->
+        <div id="ssWhiteOverlay" class="ss-white-overlay"></div>
+
+        <!-- 情報オーバーレイ -->
+        <div class="slideshow-info" id="ssInfo">
+            <div class="slideshow-info-date" id="ssDate"></div>
+            <div class="slideshow-info-comment" id="ssComment"></div>
+            <span class="slideshow-info-category" id="ssCategory"></span>
+        </div>
+
+        <!-- カウンター -->
+        <div class="slideshow-counter" id="ssCounter">1 / 10</div>
+
+        <!-- 閉じるボタン -->
+        <button class="ss-btn ss-btn-close" id="ssCloseBtn" title="閉じる" onclick="closeSlideshow()">✕</button>
+
+        <!-- コントロール -->
+        <div class="slideshow-controls" id="ssControls">
+            <div class="slideshow-progress">
+                <div class="slideshow-progress-bar" id="ssProgressBar"></div>
+            </div>
+            <div class="slideshow-btn-row">
+                <button class="ss-btn" id="ssPrevBtn" title="前へ" onclick="slideshowPrev(); resetControlsAutoHide();">⏮</button>
+                <button class="ss-btn" id="ssSpeedBtn" title="速度変更" onclick="cycleSlideshowSpeed(); resetControlsAutoHide();"><span class="ss-speed-label" id="ssSpeedLabel">5秒</span></button>
+                <button class="ss-btn ss-play" id="ssPlayBtn" title="再生/一時停止" onclick="toggleSlideshowPlay()">▶</button>
+                <button class="ss-btn" id="ssBgmBtn" title="BGM" onclick="toggleBgmPanel(); resetControlsAutoHide();">♪</button>
+                <button class="ss-btn" id="ssNextBtn" title="次へ" onclick="slideshowNext(); resetControlsAutoHide();">⏭</button>
+            </div>
+            <div class="slideshow-bgm-panel" id="ssBgmPanel" style="display:none;">
+                <div class="ss-bgm-tabs">
+                    <button class="ss-bgm-tab active" data-cat="piano" onclick="selectBgmCategory(this)">🎹 ピアノ</button>
+                    <button class="ss-bgm-tab" data-cat="musicbox" onclick="selectBgmCategory(this)">🎶 オルゴール</button>
+                    <button class="ss-bgm-tab" data-cat="acoustic" onclick="selectBgmCategory(this)">🎸 アコースティック</button>
+                    <button class="ss-bgm-tab" data-cat="relax" onclick="selectBgmCategory(this)">🌿 リラックス</button>
+                    <button class="ss-bgm-tab" data-cat="happy" onclick="selectBgmCategory(this)">🎵 ポップ</button>
+                </div>
+                <div class="ss-bgm-tracks active" data-cat="piano">
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/piano1.mp3" data-name="Beautiful Dream" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🌙</span><span class="ss-bgm-label">Beautiful Dream</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/piano2.mp3" data-name="Tears of Joy" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">💧</span><span class="ss-bgm-label">Tears of Joy</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/piano3.mp3" data-name="Discover" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">✨</span><span class="ss-bgm-label">Discover</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/piano4.mp3" data-name="Skyline" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🏙️</span><span class="ss-bgm-label">Skyline</span>
+                    </button>
+                </div>
+                <div class="ss-bgm-tracks" data-cat="musicbox">
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/musicbox1.mp3" data-name="Baby" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">👶</span><span class="ss-bgm-label">Baby</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/musicbox2.mp3" data-name="Forever Love" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">💕</span><span class="ss-bgm-label">Forever Love</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/musicbox3.mp3" data-name="Close Your Eyes" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">😴</span><span class="ss-bgm-label">Close Your Eyes</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/musicbox4.mp3" data-name="Lullaby Night" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🌟</span><span class="ss-bgm-label">Lullaby Night</span>
+                    </button>
+                </div>
+                <div class="ss-bgm-tracks" data-cat="acoustic">
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/acoustic1.mp3" data-name="Smile" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">😊</span><span class="ss-bgm-label">Smile</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/acoustic2.mp3" data-name="Owies Ukulele" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🎸</span><span class="ss-bgm-label">Owies Ukulele</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/acoustic3.mp3" data-name="That's the Way" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🌈</span><span class="ss-bgm-label">That's the Way</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/acoustic4.mp3" data-name="A Baby Story" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🍼</span><span class="ss-bgm-label">A Baby Story</span>
+                    </button>
+                </div>
+                <div class="ss-bgm-tracks" data-cat="relax">
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/relax1.mp3" data-name="Nap Time" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">😴</span><span class="ss-bgm-label">Nap Time</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/relax2.mp3" data-name="Nature Meditation" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🌿</span><span class="ss-bgm-label">Nature Meditation</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/relax3.mp3" data-name="Finding Myself" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🧘</span><span class="ss-bgm-label">Finding Myself</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/relax4.mp3" data-name="Relaxation" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🕊️</span><span class="ss-bgm-label">Relaxation</span>
+                    </button>
+                </div>
+                <div class="ss-bgm-tracks" data-cat="happy">
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/happy1.mp3" data-name="Feeling Happy" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">😄</span><span class="ss-bgm-label">Feeling Happy</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/happy2.mp3" data-name="Dance with Me" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">💃</span><span class="ss-bgm-label">Dance with Me</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/happy3.mp3" data-name="Playground Fun" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">🎪</span><span class="ss-bgm-label">Playground Fun</span>
+                    </button>
+                    <button class="ss-bgm-preset-btn" data-bgm="assets/bgm/happy4.mp3" data-name="I Love You" onclick="playBgmPreset(this)">
+                        <span class="ss-bgm-icon">❤️</span><span class="ss-bgm-label">I Love You</span>
+                    </button>
+                </div>
+                <div class="ss-bgm-util-row">
+                    <button class="ss-bgm-preset-btn" data-name="OFF" onclick="stopBgm()">
+                        <span class="ss-bgm-icon">🔇</span><span class="ss-bgm-label">OFF</span>
+                    </button>
+                    <label class="ss-bgm-preset-btn ss-bgm-custom-label">
+                        <span class="ss-bgm-icon">📁</span><span class="ss-bgm-label">自分の曲</span>
+                        <input type="file" id="ssBgmFileInput" accept="audio/*" style="display:none;">
+                    </label>
+                </div>
+                <div class="ss-bgm-volume-row">
+                    <button class="ss-btn" id="ssMuteBtn" style="width:32px;height:32px;font-size:14px;">🔊</button>
+                    <input type="range" class="ss-volume" id="ssVolume" min="0" max="100" value="50">
+                    <span class="ss-bgm-name" id="ssBgmName">BGMなし</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- BGM用オーディオ -->
+        <audio id="ssBgmAudio" loop></audio>
+    </div>
+
+</body>
 </html>

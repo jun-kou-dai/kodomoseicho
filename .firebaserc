@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "kids-growth-700b0"
-  }
+  },
+  "targets": {
+    "kids-growth-700b0": {
+      "storage": {
+        "kids-growth-700b0": [
+          "kids-growth-700b0.firebasestorage.app"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
